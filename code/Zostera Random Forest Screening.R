@@ -35,17 +35,17 @@ eelgrass_model <- gam(dens.percomp.change ~
                         s(TP.me) +
                         s(Temp.growy1max) +
                         # s(TSS.sumDme) +
-                        s(Sal.y1me) +
+                        s(Sal.me) +
                         s(Secc.me) +
                         s(Chla.me) +
-                        s(year),
+                        s(year), # can specify bs=  "re" for random effect
                       data = data)
 
 gam.check(eelgrass_model)                        
 
 summary(eelgrass_model)  
 
-plot(sm(getViz(eelgrass_model), 6))
+plot(sm(getViz(eelgrass_model), 2))
 
 light_model <- gam(Secc.me ~ s(Chla.me) +
                      s(year),
