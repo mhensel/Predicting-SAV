@@ -76,7 +76,7 @@ write_csv(RuDensWQ_spme, "~/Documents/R projects/Predicting-SAV/data/RuDensWQ_sp
 
 #may want to filter
 #RmZone_Env9010.tss <- RmZone_Env.tss %>%
-  filter(!dens.percomp.y1 > 0.90) %>% filter(!dens.percomp.y1 < 0.10)
+ # filter(!dens.percomp.y1 > 0.90) %>% filter(!dens.percomp.y1 < 0.10)
 
 #Community 2: Zostera Monoculture####
 

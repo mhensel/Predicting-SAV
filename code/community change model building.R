@@ -77,7 +77,7 @@ RmBayLOG.sem <- psem(
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.dat),
+                data = RuDensWQsem.all),
   Seccsp <- lme(log10(Secc.spme) ~
                   log10(Chla.spme) +
                   #log10(Sal.spme) +
@@ -86,7 +86,7 @@ RmBayLOG.sem <- psem(
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.dat),
+                data = RuDensWQsem.all),
   RuInt <- lme(dens.percomp.change ~
                  dens.percomp.y1 +
                  log10(Sal.spme) + 
@@ -102,17 +102,18 @@ RmBayLOG.sem <- psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = RuDensWQsem.dat),
+               data = RuDensWQsem.all),
   log10(TN.spme) %~~% log10(TP.spme),
   log10(Secc.spme) %~~% log10(Sal.spme),
   log10(Chla.spme) %~~% log10(Sal.spme),
   #log10(TP.spme) %~~% log10(Sal.spme),
   #log10(TN.spme) %~~% log10(Sal.spme),
-  data = RuDensWQsem.dat)
+  data = RuDensWQsem.all)
 
 summary(RmBayLOG.sem)
 
 #filter out double 0s####
+#this SEM is quite good. Y1 -> Y goes away
 RuppiaChangeNo0.sem <- psem(
   ChlAsp <- lme(log10(Chla.spme) ~
                   log10(Temp.spme) +
@@ -123,7 +124,7 @@ RuppiaChangeNo0.sem <- psem(
                 control = lmeControl(opt = "optim"),
                 data = RuDensWQsem.dat),
   Seccsp <- lme(log10(Secc.spme) ~
-                 # log10(Temp.spme) +
+                  log10(Temp.spme) +
                   log10(Chla.spme) +
                 #  log10(TSS.spme) +
                   log10(TN.spme) +
