@@ -12,9 +12,9 @@ data <- read.csv("./Data/ZoDensWQ_combined.csv")
 formula <- formula(paste("dens.percomp.change~dens.percomp.y1+", paste(colnames(data)[1:387], collapse = "+")))
 
 # Run random forest
-model <- randomForest(formula, data, na.action = na.omit)
+RFmodel <- randomForest(formula, data, na.action = na.omit)
 
-model_importance <- importance(model)
+model_importance <- importance(RFmodel)
 
 model_importance <- data.frame(variable = rownames(model_importance), #names(model_importance[rev(order(model_importance)), ]), 
                                IncNodePurity = model_importance) #[rev(order(model_importance)), ])
@@ -24,6 +24,14 @@ rownames(model_importance) <- NULL
 model_importance$group <-as.factor( gsub("(.*)\\..*", "\\1", model_importance$variable))
 
 model_importance %>% group_by(group) %>% summarize(important = variable[which.max(IncNodePurity)], importance = IncNodePurity[which.max(IncNodePurity)])
+
+partialPlot(RFmodel, pred.data = data, Sal.y1me)
+
+importanceOrder=order(-RFmodel$importance)
+names=rownames(RFmodel$importance)[importanceOrder][1:15]
+par(mfrow=c(8, 5), xpd=NA)
+for (name in names)
+  partialPlot(RFmodel, pred.data = as.data.frame(data %>% drop_na()), eval(name), main=name, xlab=name)
 
 # Put together models
 library(piecewiseSEM)
@@ -63,10 +71,10 @@ chla_model <- gam(Chla.me ~
 gam.check(chla_model)
 
 # Put models into SEM
-model <- psem(
+ZoGAM.sem <- psem(
   eelgrass_model,
   light_model,
   chla_model,
   data = data)
 
-summary(model)
+summary(ZoGAM.sem)

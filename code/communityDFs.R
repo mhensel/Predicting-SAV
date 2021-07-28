@@ -44,12 +44,18 @@ RuDensTime <- RuppiaDensityTime %>%
   mutate(dens.percomp.change = (dens.percomp-dens.percomp.y1), 
          SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
   rename("year" = "Year") %>% 
-  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change)
+  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
+
+#filter out some of the Stations that are mostly 0s
+RuDensTime_trim = RuDensTime %>% 
+  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
+                         "LE3.1", "WT8.3", "CB3.3W"))
+
 
 #merge it with the ENV data from tidyCBPWQ_2020
 RuDensWQ_combined <- CBP.WQ_combined %>%
   filter(STATION %in% RuppiaStations$STATION) %>%
-  full_join(RuDensTime)
+  full_join(RuDensTime_trim)
 
 RuDensWQ_combined[is.nan(RuDensWQ_combined)] <- 0
 is.na(RuDensWQ_combined) <- RuDensWQ_combined == "Inf"
@@ -63,7 +69,7 @@ write_csv(RuDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/RuDensW
 #merge it with the Spring ENV data from tidyCBPWQ_2020
 RuDensWQ_spme <- CBP.WQ_spme %>%
   filter(STATION %in% RuppiaStations$STATION) %>%
-  full_join(RuDensTime)
+  full_join(RuDensTime_trim)
 
 RuDensWQ_spme[is.nan(RuDensWQ_spme)] <- 0
 is.na(RuDensWQ_spme) <- RuDensWQ_spme == "Inf"
@@ -103,7 +109,7 @@ ZoDensTime <- ZosteraDensityTime %>%
                              Density == 4 ~ .85)) %>% #convert to density weighted means 
   mutate(dens_cov = SAVAreaHa * per.cov) %>%
   group_by(STATION, Year) %>%
-  summarize(dens.weight.mean = sum(dens_cov), 
+  summarize(dens.weight.mean = sum(dens_cov), #sum density weighted area
             SAVArea = sum(SAVAreaHa)) %>%
   mutate(dens.weight.mean.y1 = lag(dens.weight.mean, order_by = Year, k = 1), 
          SAVArea.y1 = lag(SAVArea, order_by = Year, k = 1)) %>%
@@ -115,14 +121,22 @@ ZoDensTime <- ZosteraDensityTime %>%
   mutate(dens.percomp.change = (dens.percomp-dens.percomp.y1), 
          SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
   rename("year" = "Year") %>% 
-  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change)
+  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
+
+hist(ZoDensTime %>% filter(dens.weight.mean > 0) %>% pull(dens.weight.mean))
+
+#filter out some of the Stations that are mostly 0s
+ZoDensTime_trim = ZoDensTime %>% 
+  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3"))
 
 #merge it with the ENV data from tidyCBPWQ_2020
 ZoDensWQ_combined <- CBP.WQ_combined %>%
   filter(STATION %in% ZosteraStations$STATION) %>%
-  full_join(ZoDensTime)
+  full_join(ZoDensTime_trim)
 
-ZoDensWQ_combined[is.nan(ZoDensWQ_combined)] <- 0
+qplot(x = Sal.med, y = dens.percomp.change, data = ZoDensWQ_combined)
+
+
 is.na(ZoDensWQ_combined) <- ZoDensWQ_combined == "Inf"
 is.na(ZoDensWQ_combined) <- ZoDensWQ_combined == "-Inf"
 ZoDensWQ_combined <- as.data.frame(ZoDensWQ_combined)
@@ -130,6 +144,9 @@ ZoDensWQ_combined <- as.data.frame(ZoDensWQ_combined)
 #Ruppia change and WQ in stations over time (2019)
 write_csv(ZoDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/ZoDensWQ_combined.csv")
 write_csv(ZoDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_combined.csv")
+
+qplot(x = dens.percomp.y1, y = dens.percomp, data = ZoDensWQ_combined)
+
 
 #merge it with the Spring ENV data from tidyCBPWQ_2020
 ZoDensWQ_spme <- CBP.WQ_spme %>%
