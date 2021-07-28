@@ -17,6 +17,8 @@ RuDensWQsem.dat = anti_join(RuDensWQsem.all, RmZeros)
 #RuDens_WQ= read.csv ("~/Documents/R projects/Predicting-SAV/data/RuDens_WQ.csv")
 
 #Best fitting Ruppia SEM below
+#y1 -> change disappears but everything else looks like the Ru SEM from the paper
+#compare to RuppiaChangeNo0.sem to see what removing the 0s does (not much)
 RuppiaChange.sem <- psem(
   ChlAsp <- lme(log10(Chla.spme) ~
                   log10(Temp.spme) +
@@ -27,7 +29,7 @@ RuppiaChange.sem <- psem(
                 control = lmeControl(opt = "optim"),
                 data = RuDensWQsem.all),
   Seccsp <- lme(log10(Secc.spme) ~
-               #   log10(Temp.spme) +
+                  log10(Temp.spme) +
                   log10(Chla.spme) +
                  # log10(TSS.spme) +
                   log10(TN.spme) +
@@ -69,51 +71,57 @@ RuppiaChangeSEM.coeftab = coefs(RuppiaChange.sem)
 dSep(RuppiaChange.sem)
 fisherC(RuppiaChange.sem)
 
-#from Ruppia paper
+Rm_SEM <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Rm_SEM.csv")
+
+#from Ruppia paper, w temp added. 
+#Fits exactly like the paper SEM
 RmBayLOG.sem <- psem(
-  ChlAsp <- lme(log10(Chla.spme) ~
+  ChlAsp <- lme(log10(ChlA.spme) ~
+                  log10(Temp.spme) +
                   log10(TP.spme) +
                   log10(TN.spme),
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.all),
+                data = Rm_SEM),
   Seccsp <- lme(log10(Secc.spme) ~
-                  log10(Chla.spme) +
-                  #log10(Sal.spme) +
+                  log10(ChlA.spme) +
+                  log10(Temp.spme) +
                   log10(TN.spme) +
                   log10(TP.spme),
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.all),
+                data = Rm_SEM),
   RuInt <- lme(dens.percomp.change ~
                  dens.percomp.y1 +
                  log10(Sal.spme) + 
-                 log10(Chla.spme) + 
+                 log10(ChlA.spme) + 
                  log10(TP.spme) +
                  log10(TN.spme) + 
                  log10(Secc.spme) +
+                 log10(Temp.spme) +
                  (dens.percomp.y1:log10(Sal.spme)) + 
-                 (dens.percomp.y1:log10(Chla.spme)) + 
+                 (dens.percomp.y1:log10(ChlA.spme)) + 
                  (log10(TP.spme):dens.percomp.y1) +
                  (log10(TN.spme):dens.percomp.y1) +
-                 (log10(Secc.spme):dens.percomp.y1),
+                 (log10(Secc.spme):dens.percomp.y1) +
+                 (log10(Temp.spme):dens.percomp.y1),
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = RuDensWQsem.all),
+               data = Rm_SEM),
   log10(TN.spme) %~~% log10(TP.spme),
   log10(Secc.spme) %~~% log10(Sal.spme),
-  log10(Chla.spme) %~~% log10(Sal.spme),
+  log10(ChlA.spme) %~~% log10(Sal.spme),
   #log10(TP.spme) %~~% log10(Sal.spme),
   #log10(TN.spme) %~~% log10(Sal.spme),
-  data = RuDensWQsem.all)
+  data = Rm_SEM)
 
 summary(RmBayLOG.sem)
 
 #filter out double 0s####
-#this SEM is quite good. Y1 -> Y goes away
+#this SEM is OK. Y1 -> Y goes away
 RuppiaChangeNo0.sem <- psem(
   ChlAsp <- lme(log10(Chla.spme) ~
                   log10(Temp.spme) +
@@ -245,7 +253,7 @@ View(ZoDensWQ_spme %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
 # filter(!dens.percomp.y1 < 0.02) 
 #ZoDens_WQ= read.csv ("~/Documents/R projects/Predicting-SAV/data/ZoDens_WQ.csv")
 
-#Best fitting Zoppia SEM below
+#Best fitting Zostera SEM below
 ZosteraChange.sem <- psem(
   ChlAsp <- lme(log10(Chla.spme) ~
                   log10(Temp.spme) +
