@@ -11,13 +11,13 @@ library(readxl); library(lubridate); library(naniar)
 #from Marcs computer
 load("~/Documents/R projects/Predicting-SAV/data/wtemp_sal_sec_chla_to2020.rda")
 #from the R drive
-load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/wtemp_sal_sec_chla_to2020.rda")
+load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/wtemp_sal_sec_chla_to2020.rda")
 # data1  contains fairly self-explanatory columns including DATE, STATION, PARAMETER and VALUE. The only processing I did of this set from the data hub was to average duplicates and remove a couple erroneous values
 
 #from Marcs computer
 load("~/Documents/R projects/Predicting-SAV/data/tn_tp_tss_to2020.rda")
 #from the R drive
-load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/tn_tp_tss_to2019.rda")
+load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/tn_tp_tss_to2019.rda")
 #data2. This has fewer columns than the other because I pulled this from already processed data sets. Duplicates are averaged also.There are some cases of values reported at <DL or a range due to the components being <DL. Those will be reported here in the middle of the range (or ½ DL). Also, you’ll see the RAW_VALUE and FINAL_VALUE columns. FINAL_VALUE has the adjustments I mentioned in my email below – some data values cut-out, some adjusted due to method changes. All units of these parameters are mg/L. I recommend you use FINAL_VALUE column
 
 #also load lat/longs
@@ -55,9 +55,9 @@ CBPtn = CBPstationNPSS %>%
   summarize(TN = mean(TN, na.rm = T))%>% ungroup() #some stations have 2 numbers, so take means (might only be CB7.4N)
 
 #TN Notes: some stations were corrected, but FINAL_VALUE fixed it. 
-colsums(is.na(CBPtn)) #NA: 8336 NA mostly in the 80s and early 90s
+colSums(is.na(CBPtn)) #NA: 8336 NA mostly in the 80s and early 90s
 qplot(x = date, y = TN, data = CBPtn) #Outliers: 22 values over 6.
-#CBPtn[!is.na(CBPtn$TN) & CBPtp=n$TN > 6, "TN"] <- 6
+#CBPtn[!is.na(CBPtn$TN) & CBPtn$TN > 6, "TN"] <- 6
 
 #TP####
 CBPtp <- CBPstationNPSS %>%
@@ -68,7 +68,7 @@ CBPtp <- CBPstationNPSS %>%
   summarize(TP = mean(TP, na.rm = T))%>% ungroup() #some dates have 2 numbers, so take means
 
 #TP Notes:
-colsums(is.na(CBPtp)) #NA: 932
+colSums(is.na(CBPtp)) #NA: 932
 qplot(x = date, y = TP, data = CBPtp) #Outliers: 8 points out of 70804 are above 1.
 CBPtp[!is.na(CBPtp$TP) & CBPtp$TP > 0.6, "TP"] <- 0.6
 
@@ -124,7 +124,7 @@ CBPsal <- CBPstationWTSSC %>%
 
 #Salinity Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
-colsums(is.na(CBPsal)) #NA: 0
+colSums(is.na(CBPsal)) #NA: 0
 qplot(x = date, y = Sal, data = CBPsal) #Outliers: None
 #CBPtp[!is.na(CBPtp$TP) & CBPtp$TP > 0.6, "TP"] <- 0.6
 
@@ -138,7 +138,7 @@ CBPsecc <- CBPstationWTSSC %>%
 
 #SSecchi Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
-colsums(is.na(CBPsecc)) #NA: 0
+colSums(is.na(CBPsecc)) #NA: 0
 qplot(x = date, y = Secc, data = CBPsecc) #Outliers: 8 points above 6 secchi, one above 10
 CBPsecc[!is.na(CBPsecc$Secc) & CBPsecc$Secc > 6, "Secc"] <- 6
 
@@ -154,7 +154,7 @@ CBPchla <- CBPstationWTSSC %>%
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
 colsums(is.na(CBPchla)) #NA: 0
 qplot(x = date, y = Chla, data = CBPchla) #Outliers: 1 points above 300 chla, two above 600
-CBPchla[CBPchla$Chla > 250, "Chla"] <- 250 
+CBPchla[CBPchla$Chla > 450, "Chla"] <- 450 
 
 #Master all CBP WQ dataframe####
 CBPall <- full_join(CBPtn, CBPtp) %>% 
@@ -169,9 +169,8 @@ CBPnas= CBPall %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
 View(CBPnas)
 
 #write it back into the R drive
-write_csv(CBPall, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPall_2020.csv")
-write_csv(CBPall, "~/Documents/R projects/Predicting-SAV/data/CBPall_2020.csv")
-
+#write_csv(CBPall, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPall_2020.csv")
+#write_csv(CBPall, "~/Documents/R projects/Predicting-SAV/data/CBPall_2020.csv")
 
 #visualize one
 ggplot(data = CBPall %>% filter(STATION == "CB5.1")) + 
@@ -186,7 +185,7 @@ ggplot(data = CBPall %>% filter(STATION == "CB5.1")) +
 
 
 ####summarizing Env Variables of interest MH######
-CBPall= read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPall_2020.csv")
+CBPall= read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv")
 
 #Springtime mean WQ DF CBP.WQ_spme ####
 #(145 stations * 37 years = 5365 possible obs)
@@ -205,9 +204,11 @@ is.na(CBP.WQ_spme) <- CBP.WQ_spme == "NaN"
 is.na(CBP.WQ_spme) <- CBP.WQ_spme == "Inf"
 is.na(CBP.WQ_spme) <- CBP.WQ_spme == "-Inf"
 
-write_csv(CBP.WQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_spme.csv")
-write_csv(CBP.WQ_spme, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_spme.csv")
+#write_csv(CBP.WQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_spme.csv")
+#write_csv(CBP.WQ_spme, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_spme.csv")
 
+#
+#Build other temporal datasets####
 #CBP.WQ_yearly####
 #yearly, spring, summer mean, max, mins and range. also calculate D change max min mean
 CBP.WQ_yearly <- CBPall %>%
@@ -462,6 +463,299 @@ is.na(CBP.WQ_combined) <- CBP.WQ_combined == "NaN"
 is.na(CBP.WQ_combined) <- CBP.WQ_combined == "Inf"
 is.na(CBP.WQ_combined) <- CBP.WQ_combined == "-Inf"
 
-write_csv(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+write_csv(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_combined.csv")
 write_csv(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+
+#69 Variables####
+#want full CBPsimp.WQ_summer
+CBP.WQ_69summer = CBPall %>% 
+  filter(between(month, 5, 8)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.summax = max(Chla, na.rm = T), Chla.summin = min(Chla, na.rm = T), 
+            Chla.summe = mean(Chla, na.rm = T), 
+            Secc.summax = max(Secc, na.rm = T), Secc.summin = min(Secc, na.rm = T), 
+            Secc.summe = mean(Secc, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T), Sal.summin = min(Sal, na.rm = T), 
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T), Temp.summin = min(Temp, na.rm = T), 
+            Temp.summe = mean(Temp, na.rm = T), 
+            TP.summax = max(TP, na.rm = T), TP.summin = min(TP, na.rm = T), 
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summax = max(TN, na.rm = T), TN.summin = min(TN, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T), 
+            TSS.summax = max(TSS, na.rm = T), TSS.summin = min(TSS, na.rm = T), 
+            TSS.summe = mean(TSS, na.rm = T), 
+            TSS.summed = median(TSS, na.rm = T),TN.summed = median(TN, na.rm = T),
+            TP.summed = median(TP, na.rm = T),Temp.summed = median(Temp, na.rm = T),
+            Sal.summed = median(Sal, na.rm = T),Chla.summed = median(Chla, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T)) %>% 
+  ungroup() %>%
+  group_by(STATION) %>%
+  mutate(Chla.sumy1max = lag(Chla.summax), Chla.sumy1min = lag(Chla.summin), 
+         Chla.sumy1me = lag(Chla.summe), 
+         Secc.sumy1max = lag(Secc.summax), Secc.sumy1min = lag(Secc.summin), 
+         Secc.sumy1me = lag(Secc.summe), 
+         Sal.sumy1max = lag(Sal.summax), Sal.sumy1min = lag(Sal.summin), 
+         Sal.sumy1me = lag(Sal.summe), 
+         Temp.sumy1max = lag(Temp.summax), Temp.sumy1min = lag(Temp.summin), 
+         Temp.sumy1me = lag(Temp.summe), 
+         TN.sumy1max = lag(TN.summax), TN.sumy1min = lag(TN.summin), 
+         TN.sumy1me = lag(TN.summe), 
+         TP.sumy1max = lag(TP.summax), TP.sumy1min = lag(TP.summin), 
+         TP.sumy1me = lag(TP.summe), 
+         TSS.sumy1max = lag(TSS.summax), TSS.sumy1min = lag(TSS.summin), 
+         TSS.sumy1me = lag(TSS.summe), 
+         TSS.sumy1med = lag(TSS.summed),TN.sumy1med = lag(TN.summed),
+         TP.sumy1med= lag(TP.summed), Temp.sumy1med = lag(Temp.summed),
+         Sal.sumy1med = lag(Sal.summed), Chla.sumy1med = lag(Sal.summed), 
+         Secc.sumy1med = lag(Secc.summed))
+
+####69grow, y1grow####
+CBP.WQ_69grow <- CBPall %>% 
+  filter(between(month, 3, 8)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.growmax = max(Chla, na.rm = T), Chla.growmin = min(Chla, na.rm = T), 
+            Chla.growme = mean(Chla, na.rm = T), 
+            Secc.growmax = max(Secc, na.rm = T), Secc.growmin = min(Secc, na.rm = T), 
+            Secc.growme = mean(Secc, na.rm = T), 
+            Sal.growmax = max(Sal, na.rm = T), Sal.growmin = min(Sal, na.rm = T), 
+            Sal.growme = mean(Sal, na.rm = T), 
+            Temp.growmax = max(Temp, na.rm = T), Temp.growmin = min(Temp, na.rm = T), 
+            Temp.growme = mean(Temp, na.rm = T), 
+            TP.growmax = max(TP, na.rm = T), TP.growmin = min(TP, na.rm = T), 
+            TP.growme = mean(TP, na.rm = T), 
+            TN.growmax = max(TN, na.rm = T), TN.growmin = min(TN, na.rm = T), 
+            TN.growme = mean(TN, na.rm = T),  TN.growmed = median(TN, na.rm = T),
+            TP.growmed = median(TP, na.rm = T),Temp.growmed = median(Temp, na.rm = T),
+            Sal.growmed = median(Sal, na.rm = T),Chla.growmed = median(Chla, na.rm = T), 
+            Secc.growmed = median(Secc, na.rm = T), 
+            TSS.growmax = max(TSS, na.rm = T), TSS.growmin = min(TSS, na.rm = T), 
+            TSS.growme= mean(TSS, na.rm = T), TSS.growmed = median(TSS, na.rm = T)) %>% 
+  ungroup() %>% 
+  group_by(STATION) %>%
+  mutate(Chla.growy1max = lag(Chla.growmax), Chla.growy1min = lag(Chla.growmin), 
+         Chla.growy1me = lag(Chla.growme), 
+         Secc.growy1max = lag(Secc.growmax), Secc.growy1min = lag(Secc.growmin), 
+         Secc.growy1me = lag(Secc.growme), 
+         Sal.growy1max = lag(Sal.growmax), Sal.growy1min = lag(Sal.growmin), 
+         Sal.growy1me = lag(Sal.growme), 
+         Temp.growy1max = lag(Temp.growmax), Temp.growy1min = lag(Temp.growmin), 
+         Temp.growy1me = lag(Temp.growme), 
+         TN.growy1max = lag(TN.growmax), TN.growy1min = lag(TN.growmin), 
+         TN.growy1me = lag(TN.growme), 
+         TP.growy1max = lag(TP.growmax), TP.growy1min = lag(TP.growmin), 
+         TP.growy1me = lag(TP.growme), TN.growy1med = lag(TN.growmed),
+         TP.growy1med= lag(TP.growmed), Temp.growy1med = lag(Temp.growmed),
+         Sal.growy1med = lag(Sal.growmed), Chla.growy1med = lag(Sal.growmed), 
+         Secc.growy1med = lag(Secc.growmed), 
+         TSS.growy1max = lag(TSS.growmax), TSS.growy1min = lag(TSS.growmin), 
+         TSS.growy1me = lag(TSS.growme), TSS.growy1med = lag(TSS.growmed)) %>% ungroup() %>%
+  select(year, STATION, Chla.growy1max:TSS.growy1med)
+
+
+####69spring, yspring####
+CBP.WQ_69sp <- CBPall %>% 
+  filter(between(month, 3, 6)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.spmax = max(Chla, na.rm = T), Chla.spmin = min(Chla, na.rm = T), 
+            Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spmax = max(Secc, na.rm = T), Secc.spmin = min(Secc, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spmax = max(Sal, na.rm = T), Sal.spmin = min(Sal, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spmax = max(Temp, na.rm = T), Temp.spmin = min(Temp, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            TP.spmax = max(TP, na.rm = T), TP.spmin = min(TP, na.rm = T), 
+            TP.spme = mean(TP, na.rm = T), 
+            TN.spmax = max(TN, na.rm = T), TN.spmin = min(TN, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T), TN.spmed = median(TN, na.rm = T),
+            TP.spmed = median(TP, na.rm = T),Temp.spmed = median(Temp, na.rm = T),
+            Sal.spmed = median(Sal, na.rm = T),Chla.spmed = median(Chla, na.rm = T), 
+            Secc.spmed = median(Secc, na.rm = T), 
+            TSS.spmax = max(TSS, na.rm = T), TSS.spmin = min(TSS, na.rm = T), 
+            TSS.spme = mean(TSS, na.rm = T), TSS.spmed = median(TSS, na.rm = T)) %>% 
+  ungroup()
+
+##Join 69 vars together####
+
+CBP.WQ_69vars = full_join(CBP.WQ_69grow, CBP.WQ_69sp) %>% full_join(CBP.WQ_69summer) #%>%
+  #select(-Chla.y1me, -TN.y1med, -TN.spmed, -TN.sumy1me, -TN.sumy1med, -TN.growmed, -TN.growy1med, -TN.growy1min, -TN.growy1max, -TN.growy1me, -TP.growy1med, -Secc.growy1med, -Chla.growy1med, -TN.summed, -TN.summax, -TN.summin) #removing some cols w over 400 NAs
+#mutate(STATION = replace(STATION, STATION == "LE5.5", "LE5.5-W"))
+
+#I recommend using this code to standardize NAs
+is.na(CBP.WQ_69vars) <- CBP.WQ_69vars == "NaN"
+is.na(CBP.WQ_69vars) <- CBP.WQ_69vars == "Inf"
+is.na(CBP.WQ_69vars) <- CBP.WQ_69vars == "-Inf"
+
+colSums(is.na(CBP.WQ_69vars))
+
+write_csv(CBP.WQ_69vars, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_69vars.csv")
+write_csv(CBP.WQ_69vars, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+
+#####SIMP####
+#simpler env df###
+CBPsimp <- CBPall %>% select(-TSS, -TSS.D)
+  #drop_na() #drops about 20000
+
+CBPnas= CBPsimp %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
+View(CBPnas)
+
+#CBPsimp.WQ_yearly####
+#yearly, spring, summer mean, max, mins and range. also calculate D change max min mean
+CBPsimp.WQ_yearly <- CBPsimp %>%
+  # na.omit() %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.max = max(Chla, na.rm = T), Chla.min = min(Chla, na.rm = T), 
+            Chla.me = mean(Chla, na.rm = T),  
+            Secc.max = max(Secc, na.rm = T), Secc.min = min(Secc, na.rm = T), 
+            Secc.me = mean(Secc, na.rm = T), 
+            Sal.max = max(Sal, na.rm = T), Sal.min = min(Sal, na.rm = T), 
+            Sal.me = mean(Sal, na.rm = T), 
+            Temp.max = max(Temp, na.rm = T), Temp.min = min(Temp, na.rm = T), 
+            Temp.me = mean(Temp, na.rm = T), 
+            TP.max = max(TP, na.rm = T), TP.min = min(TP, na.rm = T), 
+            TP.me = mean(TP, na.rm = T), 
+            TN.max = max(TN, na.rm = T), TN.min = min(TN, na.rm = T), 
+            TN.me = mean(TN, na.rm = T), TN.med = median(TN, na.rm = T),
+            TP.med = median(TP, na.rm = T),Temp.med = median(Temp, na.rm = T),
+            Sal.med = median(Sal, na.rm = T),Chla.med = median(Chla, na.rm = T), 
+            Secc.med = median(Chla, na.rm = T)) %>%
+  ungroup() %>% group_by(STATION) %>%
+  mutate(Chla.y1max = lag(Chla.max), Chla.y1min = lag(Chla.min), 
+         Chla.y1me = lag(Chla.me),
+         Secc.y1max = lag(Secc.max), Secc.y1min = lag(Secc.min), 
+         Secc.y1me = lag(Secc.me),
+         Sal.y1max = lag(Sal.max), Sal.y1min = lag(Sal.min), 
+         Sal.y1me = lag(Sal.me),
+         Temp.y1max = lag(Temp.max), Temp.y1min = lag(Temp.min), 
+         Temp.y1me = lag(Temp.me),
+         TN.y1max = lag(TN.max), TN.y1min = lag(TN.min), 
+         TN.y1me = lag(TN.me), 
+         TP.y1max = lag(TP.max), TP.y1min = lag(TP.min), 
+         TP.y1me = lag(TP.me), TN.y1med = lag(TN.med),
+         TP.y1med= lag(TP.med), Temp.y1med = lag(Temp.med),
+         Sal.y1med = lag(Sal.med), Chla.y1med = lag(Sal.med), 
+         Secc.y1med = lag(Secc.med)) %>% 
+  ungroup()
+
+colSums(is.na(CBPsimp.WQ_yearly))
+
+#CBPsimp.WQ_summer####
+#calc sum means
+CBPsimp.WQ_summer <- CBPsimp %>% 
+  filter(between(month, 5, 8)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.summax = max(Chla, na.rm = T), Chla.summin = min(Chla, na.rm = T), 
+            Chla.summe = mean(Chla, na.rm = T),
+            Secc.summax = max(Secc, na.rm = T), Secc.summin = min(Secc, na.rm = T), 
+            Secc.summe = mean(Secc, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T), Sal.summin = min(Sal, na.rm = T), 
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T), Temp.summin = min(Temp, na.rm = T), 
+            Temp.summe = mean(Temp, na.rm = T), 
+            TP.summax = max(TP, na.rm = T), TP.summin = min(TP, na.rm = T), 
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summax = max(TN, na.rm = T), TN.summin = min(TN, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T), TN.summed = median(TN, na.rm = T),
+            TP.summed = median(TP, na.rm = T),Temp.summed = median(Temp, na.rm = T),
+            Sal.summed = median(Sal, na.rm = T),Chla.summed = median(Chla, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T)) %>% 
+  ungroup() %>%
+  group_by(STATION) %>%
+  mutate(Chla.sumy1max = lag(Chla.summax), Chla.sumy1min = lag(Chla.summin), 
+         Chla.sumy1me = lag(Chla.summe), 
+         Secc.sumy1max = lag(Secc.summax), Secc.sumy1min = lag(Secc.summin), 
+         Secc.sumy1me = lag(Secc.summe),
+         Sal.sumy1max = lag(Sal.summax), Sal.sumy1min = lag(Sal.summin), 
+         Sal.sumy1me = lag(Sal.summe), 
+         Temp.sumy1max = lag(Temp.summax), Temp.sumy1min = lag(Temp.summin), 
+         Temp.sumy1me = lag(Temp.summe), 
+         TN.sumy1max = lag(TN.summax), TN.sumy1min = lag(TN.summin), 
+         TN.sumy1me = lag(TN.summe), 
+         TP.sumy1max = lag(TP.summax), TP.sumy1min = lag(TP.summin), 
+         TP.sumy1me = lag(TP.summe), TN.sumy1med = lag(TN.summed),
+         TP.sumy1med= lag(TP.summed), Temp.sumy1med = lag(Temp.summed),
+         Sal.sumy1med = lag(Sal.summed), Chla.sumy1med = lag(Sal.summed), 
+         Secc.sumy1med = lag(Secc.summed)) %>% ungroup()
+colSums(is.na(CBPsimp.WQ_summer))
+
+#CBPsimp.WQ_spring####
+#All springtime metrics
+CBPsimp.WQ_spring <- CBPsimp %>% 
+  filter(between(month, 3, 5)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.spmax = max(Chla, na.rm = T), Chla.spmin = min(Chla, na.rm = T), 
+            Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spmax = max(Secc, na.rm = T), Secc.spmin = min(Secc, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spmax = max(Sal, na.rm = T), Sal.spmin = min(Sal, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spmax = max(Temp, na.rm = T), Temp.spmin = min(Temp, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            TP.spmax = max(TP, na.rm = T), TP.spmin = min(TP, na.rm = T), 
+            TP.spme = mean(TP, na.rm = T), 
+            TN.spmax = max(TN, na.rm = T), TN.spmin = min(TN, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T), TN.spmed = median(TN, na.rm = T),
+            TP.spmed = median(TP, na.rm = T),Temp.spmed = median(Temp, na.rm = T),
+            Sal.spmed = median(Sal, na.rm = T),Chla.spmed = median(Chla, na.rm = T), 
+            Secc.spmed = median(Secc, na.rm = T)) %>% ungroup()
+colSums(is.na(CBPsimp.WQ_spring))
+
+#CBPsimp.WQ_grow####
+#growing season
+CBPsimp.WQ_grow <- CBPsimp %>% 
+  filter(between(month, 3, 7)) %>%
+  group_by(year, STATION) %>% 
+  summarise(Chla.growmax = max(Chla, na.rm = T), Chla.growmin = min(Chla, na.rm = T), 
+            Chla.growme = mean(Chla, na.rm = T), 
+            Secc.growmax = max(Secc, na.rm = T), Secc.growmin = min(Secc, na.rm = T), 
+            Secc.growme = mean(Secc, na.rm = T), 
+            Sal.growmax = max(Sal, na.rm = T), Sal.growmin = min(Sal, na.rm = T), 
+            Sal.growme = mean(Sal, na.rm = T), 
+            Temp.growmax = max(Temp, na.rm = T), Temp.growmin = min(Temp, na.rm = T), 
+            Temp.growme = mean(Temp, na.rm = T), 
+            TP.growmax = max(TP, na.rm = T), TP.growmin = min(TP, na.rm = T), 
+            TP.growme = mean(TP, na.rm = T), 
+            TN.growmax = max(TN, na.rm = T), TN.growmin = min(TN, na.rm = T), 
+            TN.growme = mean(TN, na.rm = T),  TN.growmed = median(TN, na.rm = T),
+            TP.growmed = median(TP, na.rm = T),Temp.growmed = median(Temp, na.rm = T),
+            Sal.growmed = median(Sal, na.rm = T),Chla.growmed = median(Chla, na.rm = T), 
+            Secc.growmed = median(Secc, na.rm = T)) %>% ungroup() %>% 
+  group_by(STATION) %>%
+  mutate(Chla.growy1max = lag(Chla.growmax), Chla.growy1min = lag(Chla.growmin), 
+         Chla.growy1me = lag(Chla.growme), 
+         Secc.growy1max = lag(Secc.growmax), Secc.growy1min = lag(Secc.growmin), 
+         Secc.growy1me = lag(Secc.growme), 
+         Sal.growy1max = lag(Sal.growmax), Sal.growy1min = lag(Sal.growmin), 
+         Sal.growy1me = lag(Sal.growme), 
+         Temp.growy1max = lag(Temp.growmax), Temp.growy1min = lag(Temp.growmin), 
+         Temp.growy1me = lag(Temp.growme), 
+         TN.growy1max = lag(TN.growmax), TN.growy1min = lag(TN.growmin), 
+         TN.growy1me = lag(TN.growme), 
+         TP.growy1max = lag(TP.growmax), TP.growy1min = lag(TP.growmin), 
+         TP.growy1me = lag(TP.growme), TN.growy1med = lag(TN.growmed),
+         TP.growy1med= lag(TP.growmed), Temp.growy1med = lag(Temp.growmed),
+         Sal.growy1med = lag(Sal.growmed), Chla.growy1med = lag(Sal.growmed), 
+         Secc.growy1med = lag(Secc.growmed)) %>% ungroup()
+colSums(is.na(CBPsimp.WQ_grow))
+
+#Joining dfs togehter####
+#Depends on how you want to do this but we have CBP.WQ_summer, CBP.WQ_spring, and CBP.WQ_yearly
+#
+CBPsimp.WQ_combined = full_join(CBPsimp.WQ_yearly, CBPsimp.WQ_spring) %>% full_join(CBPsimp.WQ_summer) %>%
+  full_join(CBPsimp.WQ_grow) %>%
+  select(-Chla.y1me, -TN.y1med, -TN.spmed, -TN.sumy1me, -TN.sumy1med, -TN.growmed, -TN.growy1med, -TN.growy1min, -TN.growy1max, -TN.growy1me, -TP.growy1med, -Secc.growy1med, -Chla.growy1med, -TN.summed, -TN.summax, -TN.summin) #removing some cols w over 400 NAs
+#mutate(STATION = replace(STATION, STATION == "LE5.5", "LE5.5-W"))
+
+#I recommend using this code to standardize NAs
+is.na(CBPsimp.WQ_combined) <- CBPsimp.WQ_combined == "NaN"
+is.na(CBPsimp.WQ_combined) <- CBPsimp.WQ_combined == "Inf"
+is.na(CBPsimp.WQ_combined) <- CBPsimp.WQ_combined == "-Inf"
+
+colSums(is.na(CBPsimp.WQ_combined))
+
+write_csv(CBPsimp.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPsimp.WQ_combined.csv")
+write_csv(CBPsimp.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
+
+
 

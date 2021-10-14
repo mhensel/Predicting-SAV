@@ -2,10 +2,24 @@
 library(tidyverse); library(readxl)
 
 #load in the Water Quality data
-CBP.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+#CBP.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 CBP.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
-#Community 1: Ruppia maritima monoculture####
+#CBPsimp.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
+CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsmip.WQ_combined.csv")
+
+#load in DF of cluster groups per station
+#clusters = read.csv("~/Documents/R projects/TraitsSAV/spp.prop.cluster.csv")
+
+#community.desig = clusters %>% select(STATION, LATITUDE, LONGITUDE, clust.group, clust.no) #now use these clust.group to filter data! 
+
+#
+##
+###
+####Community 1: Ruppia maritima monoculture####
+###
+##
+#
 #load in data to make SAV density over time per zone DF
 RuppiaOverlap_StationZone <- read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Ruppia SAV Zones Overlap with Station Zones.xlsx")
 
@@ -46,30 +60,41 @@ RuDensTime <- RuppiaDensityTime %>%
   rename("year" = "Year") %>% 
   select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
 
+#Full DF all Stations. Use spring data instead####
+#Here is I recommend not using this DF (even simp): when we drop_na() for the sem, there are too many chances for a dumb NA kick out (e.g., who cares if this one datapoint didnt have a TN.sumy1ran??)
+RuDensWQ_combined.ALL <- CBPsimp.WQ_combined %>%
+  filter(STATION %in% RuppiaStations$STATION) 
+
+is.na(RuDensWQ_combined.ALL) <- RuDensWQ_combined.ALL == "Inf"
+is.na(RuDensWQ_combined.ALL) <- RuDensWQ_combined.ALL == "-Inf"
+RuDensWQ_combined.ALL <- as.data.frame(RuDensWQ_combined.ALL)
+
+#Bad STATIONS####
 #filter out some of the Stations that are mostly 0s
-RuDensTime_trim = RuDensTime %>% 
-  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-                         "LE3.1", "WT8.3", "CB3.3W"))
+#RuDensTime_trim = RuDensTime %>% 
+#  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
+#                         "LE3.1", "WT8.3", "CB3.3W"))
 
 
 #merge it with the ENV data from tidyCBPWQ_2020
-RuDensWQ_combined <- CBP.WQ_combined %>%
+RuDensWQ_combined <- CBPsimp.WQ_combined %>%
   filter(STATION %in% RuppiaStations$STATION) %>%
-  full_join(RuDensTime_trim)
+  full_join(RuDensTime)
 
-RuDensWQ_combined[is.nan(RuDensWQ_combined)] <- 0
 is.na(RuDensWQ_combined) <- RuDensWQ_combined == "Inf"
 is.na(RuDensWQ_combined) <- RuDensWQ_combined == "-Inf"
 RuDensWQ_combined <- as.data.frame(RuDensWQ_combined)
 
 #Ruppia change and WQ in stations over time (2019)
-write_csv(RuDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/RuDensWQ_combined.csv")
-write_csv(RuDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/RuDensWQ_combined.csv")
+#write_csv(RuDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/RuDensWQ_combined.csv")
+#write_csv(RuDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/RuDensWQ_combined.csv")
 
+#Spring Ru Data Merge USE THIS#####
 #merge it with the Spring ENV data from tidyCBPWQ_2020
+CBP.WQ_spme = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_spme.csv")
 RuDensWQ_spme <- CBP.WQ_spme %>%
   filter(STATION %in% RuppiaStations$STATION) %>%
-  full_join(RuDensTime_trim)
+  full_join(RuDensTime)
 
 RuDensWQ_spme[is.nan(RuDensWQ_spme)] <- 0
 is.na(RuDensWQ_spme) <- RuDensWQ_spme == "Inf"
@@ -77,14 +102,33 @@ is.na(RuDensWQ_spme) <- RuDensWQ_spme == "-Inf"
 RuDensWQ_spme <- as.data.frame(RuDensWQ_spme)
 
 #Ruppia change and Spring WQ in stations over time (2019)
-write_csv(RuDensWQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/RuDensWQ_spme.csv")
+#write_csv(RuDensWQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/RuDensWQ_spme.csv")
 write_csv(RuDensWQ_spme, "~/Documents/R projects/Predicting-SAV/data/RuDensWQ_spme.csv")
 
-#may want to filter
-#RmZone_Env9010.tss <- RmZone_Env.tss %>%
- # filter(!dens.percomp.y1 > 0.90) %>% filter(!dens.percomp.y1 < 0.10)
 
+#69 Vars Ru Data Merge#####
+#merge it with the 69vars ENV data from tidyCBPWQ_2020
+CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+RuDensWQ_69 <- CBP.WQ_69vars %>%
+  filter(STATION %in% RuppiaStations$STATION) %>%
+  full_join(RuDensTime)
+
+RuDensWQ_69[is.nan(RuDensWQ_69)] <- 0
+is.na(RuDensWQ_69) <- RuDensWQ_69 == "Inf"
+is.na(RuDensWQ_69) <- RuDensWQ_69 == "-Inf"
+RuDensWQ_69 <- as.data.frame(RuDensWQ_69)
+
+#Ruppia change and Spring WQ in stations over time (2019)
+#write_csv(RuDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/RuDensWQ_69.csv")
+write_csv(RuDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/RuDensWQ_69.csv")
+
+#
+##
+###
 #Community 2: Zostera Monoculture####
+###
+##
+#
 
 ZosteraOverlap_StationZone <- read_excel("/Volumes/savshare2/Current Projects/Ruppia/Ruppia areas in Chesapeake Bay/Zostera SAV Zones Overlap with Station Zones.xlsx")
 
@@ -126,13 +170,13 @@ ZoDensTime <- ZosteraDensityTime %>%
 hist(ZoDensTime %>% filter(dens.weight.mean > 0) %>% pull(dens.weight.mean))
 
 #filter out some of the Stations that are mostly 0s
-ZoDensTime_trim = ZoDensTime %>% 
-  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3"))
+#ZoDensTime_trim = ZoDensTime %>% 
+#  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3"))
 
 #merge it with the ENV data from tidyCBPWQ_2020
-ZoDensWQ_combined <- CBP.WQ_combined %>%
+ZoDensWQ_combined <- CBPsimp.WQ_combined %>%
   filter(STATION %in% ZosteraStations$STATION) %>%
-  full_join(ZoDensTime_trim)
+  full_join(ZoDensTime)
 
 qplot(x = Sal.med, y = dens.percomp.change, data = ZoDensWQ_combined)
 
@@ -141,9 +185,9 @@ is.na(ZoDensWQ_combined) <- ZoDensWQ_combined == "Inf"
 is.na(ZoDensWQ_combined) <- ZoDensWQ_combined == "-Inf"
 ZoDensWQ_combined <- as.data.frame(ZoDensWQ_combined)
 
-#Ruppia change and WQ in stations over time (2019)
-write_csv(ZoDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/ZoDensWQ_combined.csv")
-write_csv(ZoDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_combined.csv")
+#Zostera change and WQ in stations over time (2019)
+#write_csv(ZoDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/ZoDensWQ_combined.csv")
+#write_csv(ZoDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_combined.csv")
 
 qplot(x = dens.percomp.y1, y = dens.percomp, data = ZoDensWQ_combined)
 
@@ -158,15 +202,201 @@ is.na(ZoDensWQ_spme) <- ZoDensWQ_spme == "Inf"
 is.na(ZoDensWQ_spme) <- ZoDensWQ_spme == "-Inf"
 ZoDensWQ_spme <- as.data.frame(ZoDensWQ_spme)
 
+#Zostera change and Spring WQ in stations over time (2019)
+#write_csv(ZoDensWQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/ZoDensWQ_spme.csv")
+#write_csv(ZoDensWQ_spme, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_spme.csv")
+
+#69 Vars Zostera Data Merge#####
+#merge it with the 69vars ENV data from tidyCBPWQ_2020
+CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+ZoDensWQ_69 <- CBP.WQ_69vars %>%
+  filter(STATION %in% ZosteraStations$STATION) %>%
+  full_join(ZoDensTime)
+
+ZoDensWQ_69[is.nan(ZoDensWQ_69)] <- 0
+is.na(ZoDensWQ_69) <- ZoDensWQ_69 == "Inf"
+is.na(ZoDensWQ_69) <- ZoDensWQ_69 == "-Inf"
+ZoDensWQ_69 <- as.data.frame(ZoDensWQ_69)
+
 #Ruppia change and Spring WQ in stations over time (2019)
-write_csv(ZoDensWQ_spme, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/ZoDensWQ_spme.csv")
-write_csv(ZoDensWQ_spme, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_spme.csv")
+#write_csv(ZoDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/ZoDensWQ_69.csv")
+write_csv(ZoDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_69.csv")
+
 
 #may want to filter
 #RmZone_Env9010.tss <- RmZone_Env.tss %>%
 #filter(!dens.percomp.y1 > 0.90) %>% filter(!dens.percomp.y1 < 0.10)
 
-#Community 3: Mixed mesohaline #####
+#
+##
+###
+#Prep MixMeso and Fresh communities here####
 
-#Community 4: Oligohaline/Tidal Fresh ####
+#this is actually data prep for both of the next two community DFs
+BaeOverlap_StationZone <- read_excel("~/Documents/R projects/Predicting-SAV/data/SAV Composite with max density and potential habitat.xlsx")
+
+BaeStations <- BaeOverlap_StationZone %>% 
+  #dplyr::filter(ZMZoneSAV_HA > 0) %>% #filter out non-Zostera: 25 total stations
+  mutate(denscomp.max = (D4_Ha*.85) + (D3_Ha*.55) + (D2_Ha*.25) + (D1_Ha*.05)) %>% #calculate max composite area
+  select(STATION, denscomp.max, SAV_HA) #clean up this DF
+
+#load in SAV area by year for ALL stations
+BaeDensityTime <- read_excel("~/Documents/R projects/Predicting-SAV/data/SAV Area by Year by Station Zone.xlsx")
+
+#calculate SAV coverage in each station zone for each year and year - 1
+
+####Station Baywide change over time####
+#denspercomp only... use this for master code file
+BaeDensTime <- BaeDensityTime %>%
+ # filter(STATION %in% ZosteraStations$STATION) %>%
+  #filter(between(Year, 1990, 2019)) %>% use this if you want to create a certain time dataset
+  mutate(per.cov = case_when(Density == 1 ~ .05,
+                             Density == 2 ~ .25, 
+                             Density == 3 ~ .55, 
+                             Density == 4 ~ .85)) %>% #convert to density weighted means 
+  mutate(dens_cov = SAVAreaHa * per.cov) %>%
+  group_by(STATION, Year) %>%
+  summarize(dens.weight.mean = sum(dens_cov), #sum density weighted area
+            SAVArea = sum(SAVAreaHa)) %>%
+  mutate(dens.weight.mean.y1 = lag(dens.weight.mean, order_by = Year, k = 1), 
+         SAVArea.y1 = lag(SAVArea, order_by = Year, k = 1)) %>%
+  full_join(BaeStations) %>% group_by(STATION) %>% 
+  mutate(dens.percomp = dens.weight.mean/denscomp.max, 
+         dens.percomp.y1 = dens.weight.mean.y1/denscomp.max, 
+         SAVArea.percomp = SAVArea/SAV_HA, 
+         SAVArea.percomp.y1 = SAVArea.y1/SAV_HA) %>% 
+  mutate(dens.percomp.change = (dens.percomp-dens.percomp.y1), 
+         SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
+  rename("year" = "Year") %>% 
+  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
+
+#2300 DWMs are 0
+hist(BaeDensTime %>% filter(dens.weight.mean > 0) %>% pull(dens.weight.mean))
+
+#filter out some of the Stations that are mostly 0s
+#ZoDensTime_trim = ZoDensTime %>% 
+#  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3"))
+
+#merge it with the ENV data from tidyCBPWQ_2020
+BaeDensWQ_combined <- CBPsimp.WQ_combined %>%
+  filter(STATION %in% BaeStations$STATION) %>%
+  full_join(BaeDensTime)
+
+qplot(x = Sal.med, y = dens.percomp.change, data = BaeDensWQ_combined)
+
+
+is.na(BaeDensWQ_combined) <- BaeDensWQ_combined == "Inf"
+is.na(BaeDensWQ_combined) <- BaeDensWQ_combined == "-Inf"
+BaeDensWQ_combined <- as.data.frame(BaeDensWQ_combined)
+
+#Bae change and WQ in stations over time (2019)
+#write_csv(BaeDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/BaeDensWQ_combined.csv")
+#write_csv(BaeDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_combined.csv")
+
+qplot(x = dens.percomp.y1, y = dens.percomp, data = BaeDensWQ_combined)
+
+#69 Vars Baewide Data Merge#####
+#merge it with the 69vars ENV data from tidyCBPWQ_2020
+CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+BDWQ_69 <- CBP.WQ_69vars %>%
+  filter(STATION %in% BaeStations$STATION) %>%
+  full_join(BaeDensTime)
+
+BDWQ_69[is.nan(BDWQ_69)] <- 0
+is.na(BDWQ_69) <- BDWQ_69 == "Inf"
+is.na(BDWQ_69) <- BDWQ_69 == "-Inf"
+BDWQ_69 <- as.data.frame(BDWQ_69)
+
+#Baywide change and Spring WQ in stations over time (2019)
+
+#load in DF of cluster groups per station
+clusters = read.csv("~/Documents/R projects/TraitsSAV/spp.prop.cluster.csv")
+
+community.desig = clusters %>% select(STATION, LATITUDE, LONGITUDE, clust.group, clust.no) #now use these clust.group to filter data! 
+
+#write_csv(community.desig, "~/Documents/R projects/Predicting-SAV/data/community.desig.csv")
+
+BaeDensWQ_69 = full_join(community.desig, BDWQ_69)
+
+#write_csv(BaeDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/BaeDensWQ_69.csv")
+write_csv(BaeDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_69.csv")
+
+
+#
+##
+###
+#####Community 3: Mixed mesohaline #####
+###
+##
+#
+
+#BaeDensWQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_combined.csv")
+MixMesoDensWQ_combined = BaeDensWQ_combined %>% 
+  full_join(community.desig) %>%
+  filter(clust.group == "MixedMeso") %>% select(-clust.group)
+
+length(unique(MixMesoDensWQ_combined$STATION)) #24 total stations in Mixed Meso
+
+#Mixed Mesohaline change and ALL vars WQ in stations over time (2019)
+#write_csv(MixMesoDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/MixMesoDensWQ_combined.csv")
+#write_csv(MixMesoDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/MixMesoDensWQ_combined.csv")
+
+#BaeDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_69.csv")
+MixMesoDensWQ_69 = BaeDensWQ_69 %>% 
+  #full_join(community.desig) %>%
+  filter(clust.group == "MixedMeso") %>% select(-clust.group)
+
+length(unique(MixMesoDensWQ_69$STATION)) #24 total stations in Mixed Meso
+
+#Mixed Mesohaline change and 69 WQ in stations over time (2019)
+#write_csv(MixMesoDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/MixMesoDensWQ_69.csv")
+write_csv(MixMesoDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/MixMesoDensWQ_69.csv")
+
+
+#
+##
+###
+#####Community 4: Oligohaline/Tidal Fresh #####
+###
+##
+#
+#BaeDensWQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_combined.csv")
+FreshDensWQ_combined = BaeDensWQ_combined %>% 
+  full_join(community.desig) %>%
+  filter(clust.group == "Fresh") %>% select(-clust.group)
+
+length(unique(FreshDensWQ_combined$STATION)) #45 total stations in Fresh
+
+# Fresh change and 69 vars WQ in stations over time (2019)
+#write_csv(FreshDensWQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/FreshDensWQ_combined.csv")
+#write_csv(FreshDensWQ_combined, "~/Documents/R projects/Predicting-SAV/data/FreshDensWQ_combined.csv")
+
+FreshDensWQ_69 = BaeDensWQ_69 %>% 
+ # full_join(community.desig) %>%
+  filter(clust.group == "Fresh") %>% select(-clust.group)
+
+length(unique(FreshDensWQ_69$STATION)) #45 total stations in Fresh
+
+#Mixed Mesohaline change and 69 WQ in stations over time (2019)
+#write_csv(FreshDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/FreshDensWQ_69.csv")
+write_csv(FreshDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/FreshDensWQ_69.csv")
+
+#BaeDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/BaeDensWQ_69.csv")
+
+###Clusters per Station####
+#Change RuZo to Ruppia or Zostera
+RuSTA = unique(RuppiaStations$STATION) 
+ZoSTA = unique(ZosteraStations$STATION)
+
+Rsta = tibble(STATION = c(RuSTA), 
+               clust.group = "Ruppia")
+Zsta = tibble(STATION = c(ZoSTA), 
+              clust.group = "Zostera")
+RZsta = bind_rows(Rsta, Zsta)
+
+mmfSTA = full_join(community.desig, RZsta, by = "STATION") %>%
+  rename(RuZo_JJ = clust.group.y) %>% select(-clust.no) 
+
+write_csv(mmfSTA, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/Community By Station.csv")
+
 
