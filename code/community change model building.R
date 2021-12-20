@@ -26,26 +26,28 @@ RmZeros = RuDensWQsem.all %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.
   dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
 #anti join the 0s to get a No0 df
 RuDensWQsem.No0 = anti_join(RuDensWQsem.all, RmZeros) %>% drop_na() #1323 points, 
+
+
 #examined the df and found that these were problematic stations
-RuDensWQsem.Few0 = RuDensWQsem.all %>%
-filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-                       "LE3.1", "WT8.3", "CB3.3W")) 
-#69 var df needed for max mins etc
-RuDensWQsem.69 = RuDensWQ_69 %>%  drop_na() %>% #piecewise needs NAs dropped, 500 points from 84,85,88,00
-  dplyr::filter(Sal.spme > 1)
+#RuDensWQsem.Few0 = RuDensWQsem.all %>%
+#filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
+#                       "LE3.1", "WT8.3", "CB3.3W")) 
+#69 var df needed for max mins etc, but we dont use it for Ruppia so can ignore
+#RuDensWQsem.69 = RuDensWQ_69 %>%  drop_na() %>% #piecewise needs NAs dropped, 500 points from 84,85,88,00
+#  dplyr::filter(Sal.spme > 1)
 
-RmZeros69 = RuDensWQsem.69 %>% 
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0) 
+#RmZeros69 = RuDensWQsem.69 %>% 
+#  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0) 
 
-RuDensWQsem.69No0 = anti_join(RuDensWQsem.69, RmZeros69) 
+#RuDensWQsem.69No0 = anti_join(RuDensWQsem.69, RmZeros69) 
 
-RuDensWQsem.Few0 = RuDensWQsem.all %>%
-  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-                         "LE3.1", "WT8.3", "CB3.3W")) 
+#RuDensWQsem.Few0 = RuDensWQsem.all %>%
+#  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
+#                         "LE3.1", "WT8.3", "CB3.3W")) 
 
 #na exploration
-spnas= RuDensWQ_spme %>% group_by(year) %>% 
-  summarise_all(~sum(is.na(.)))
+#spnas= RuDensWQ_spme %>% group_by(year) %>% 
+#  summarise_all(~sum(is.na(.)))
 
 
 
@@ -183,7 +185,7 @@ RuPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.Rudwm,
                     control = lmeControl(opt = "optim"), data = RuDensWQsem.No0)
 
 summary(RuPred.lmer)
-r.squaredGLMM(RuPred.lmer)
+r2(RuPred.lmer)
 #           R2m       R2c
 #[1,] 0.8127525 0.8127563
 

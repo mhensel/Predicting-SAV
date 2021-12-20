@@ -6,7 +6,7 @@ library(tidyverse); library(readxl)
 CBP.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
 #CBPsimp.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
-CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsmip.WQ_combined.csv")
+CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
 
 #load in DF of cluster groups per station
 #clusters = read.csv("~/Documents/R projects/TraitsSAV/spp.prop.cluster.csv")
@@ -310,6 +310,8 @@ BDWQ_69 <- as.data.frame(BDWQ_69)
 #Baywide change and Spring WQ in stations over time (2019)
 
 #load in DF of cluster groups per station
+#####NOTE: 12/20/2021 I noticed some of the MixedMeso are really ruppia and such (or partially?) Check this other file too that we made up for the sticky app ####
+clusters_manual <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/Community by Station.csv")
 clusters = read.csv("~/Documents/R projects/TraitsSAV/spp.prop.cluster.csv")
 
 community.desig = clusters %>% select(STATION, LATITUDE, LONGITUDE, clust.group, clust.no) #now use these clust.group to filter data! 
