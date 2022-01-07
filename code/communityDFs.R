@@ -1,12 +1,12 @@
 #Code to build the SAV change and water quality over time dataframe for each of the 4 communities
 library(tidyverse); library(readxl)
 
-#load in the Water Quality data
+#load in the Water Quality data. I think most use the 69vars df,
 #CBP.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_combined.csv")
-CBP.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+#CBP.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
 #CBPsimp.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
-CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
+#CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsimp.WQ_combined.csv")
 
 #load in DF of cluster groups per station
 #clusters = read.csv("~/Documents/R projects/TraitsSAV/spp.prop.cluster.csv")
@@ -22,6 +22,8 @@ CBPsimp.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBPsi
 #
 #load in data to make SAV density over time per zone DF
 RuppiaOverlap_StationZone <- read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Ruppia SAV Zones Overlap with Station Zones.xlsx")
+
+####NOTE: NEED TO REDO THIS ABOVE FROM THE SAV AREA BY YEAR BY STATION ZONE FILE BECAUSE WE ARENT GOING TO BE UPDATING TO 2020, THIS ABOVE FILE####
 
 RuppiaStations <- RuppiaOverlap_StationZone %>% 
   dplyr::filter(RMZoneSAV_HA > 0) %>% #filter out non-Ruppia: 51 total stations
@@ -60,7 +62,7 @@ RuDensTime <- RuppiaDensityTime %>%
   rename("year" = "Year") %>% 
   select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
 
-#Full DF all Stations. Use spring data instead####
+#Full DF all Stations. Use spring data instead, SKIP THIS####
 #Here is I recommend not using this DF (even simp): when we drop_na() for the sem, there are too many chances for a dumb NA kick out (e.g., who cares if this one datapoint didnt have a TN.sumy1ran??)
 RuDensWQ_combined.ALL <- CBPsimp.WQ_combined %>%
   filter(STATION %in% RuppiaStations$STATION) 
