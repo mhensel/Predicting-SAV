@@ -17,7 +17,7 @@ load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/wtem
 #from Marcs computer
 load("~/Documents/R projects/Predicting-SAV/data/tn_tp_tss_to2020.rda")
 #from the R drive
-load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/tn_tp_tss_to2019.rda")
+load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/tn_tp_tss_to2020.rda")
 #data2. This has fewer columns than the other because I pulled this from already processed data sets. Duplicates are averaged also.There are some cases of values reported at <DL or a range due to the components being <DL. Those will be reported here in the middle of the range (or ½ DL). Also, you’ll see the RAW_VALUE and FINAL_VALUE columns. FINAL_VALUE has the adjustments I mentioned in my email below – some data values cut-out, some adjusted due to method changes. All units of these parameters are mg/L. I recommend you use FINAL_VALUE column
 
 #also load lat/longs
@@ -466,8 +466,8 @@ is.na(CBP.WQ_combined) <- CBP.WQ_combined == "-Inf"
 write_csv(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_combined.csv")
 write_csv(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
-#69 Variables####
-#want full CBPsimp.WQ_summer
+#69 Variables Changed seasons####
+#NOTE: Growing season is to august, and spring is till june in this!!!1
 CBP.WQ_69summer = CBPall %>% 
   filter(between(month, 5, 8)) %>%
   group_by(year, STATION) %>% 
@@ -511,6 +511,7 @@ CBP.WQ_69summer = CBPall %>%
          Secc.sumy1med = lag(Secc.summed))
 
 ####69grow, y1grow####
+#we dont really need THiS years growing season
 CBP.WQ_69grow <- CBPall %>% 
   filter(between(month, 3, 8)) %>%
   group_by(year, STATION) %>% 
@@ -550,7 +551,7 @@ CBP.WQ_69grow <- CBPall %>%
          Secc.growy1med = lag(Secc.growmed), 
          TSS.growy1max = lag(TSS.growmax), TSS.growy1min = lag(TSS.growmin), 
          TSS.growy1me = lag(TSS.growme), TSS.growy1med = lag(TSS.growmed)) %>% ungroup() %>%
-  select(year, STATION, Chla.growy1max:TSS.growy1med)
+  select(year, STATION, Chla.growy1max:TSS.growy1med) #hastag this out if you want to keep everything, but we dont use the grow data bc it contains time AFTER the aerial surveys
 
 
 ####69spring, yspring####
@@ -578,7 +579,7 @@ CBP.WQ_69sp <- CBPall %>%
 
 ##Join 69 vars together####
 
-CBP.WQ_69vars = full_join(CBP.WQ_69grow, CBP.WQ_69sp) %>% full_join(CBP.WQ_69summer) #%>%
+CBP.WQ_69vars = full_join(CBP.WQ_69grow, CBP.WQ_69summer) %>% full_join(CBP.WQ_69sp) #%>%
   #select(-Chla.y1me, -TN.y1med, -TN.spmed, -TN.sumy1me, -TN.sumy1med, -TN.growmed, -TN.growy1med, -TN.growy1min, -TN.growy1max, -TN.growy1me, -TP.growy1med, -Secc.growy1med, -Chla.growy1med, -TN.summed, -TN.summax, -TN.summin) #removing some cols w over 400 NAs
 #mutate(STATION = replace(STATION, STATION == "LE5.5", "LE5.5-W"))
 
