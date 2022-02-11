@@ -12,8 +12,33 @@ install_github("jslefche/piecewiseSEM@devel")
 #Use predict and lmer to calculate pseudo R2 (i.e., dens.percomp to dens.weight.mean)
 #After this, unsure. I would like: non logged SEM, GAM, lm, etc. but the "test" ones mostly
 
+####UPDATED: 1/21/22####
+#We have the new, better DF for each Community here: 
+
+SAVCommDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
+
+SAVCommDensWQ_69 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
+
+SAVCommZeros = SAVCommDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1))  %>%
+  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
+#anti join the 0s to get a No0 df
+SAVCommDensWQ_69sem.No0 = anti_join(SAVCommDensWQ_69, SAVCommZeros) %>% 
+  select(STATION, year, SpCluster, dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, dens.percomp.change, denscomp.max, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Sal.summed, Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, TP.summe, TP.summax, TN.spme, TN.spmed, TN.summe) #you'll want to select down more and then drop NA at each community, but this is technically all we need for now. IDK whats best but nice to have this here. 
+
+write.csv(SAVCommDensWQ_69sem.No0, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69sem.No0.csv")
+
+#nacheck
+View(CC.wl_2021_2060 %>% group_by(STATION, year) %>% 
+       summarise(across(everything(), ~ sum(is.na(.))))) #%>%
+#  select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe))
+
+
+qplot(x = year, y = dens.percomp.change, color = SpCluster, data = SAVCommDensWQ_69sem.No0, 
+      geom = c("point", "smooth"))
+
 
 #Community 1 Ruppia maritima monoculture####
+#OldRuDens_SEM DF build####
 #load in Ru Change and WQ data SPRING ONLY
 RuDensWQsem.all = read.csv("~/Documents/R projects/Predicting-SAV/data/RuDensWQ_spme.csv")%>% #this DF has about 130 more points than Rm_SEM bc springtime means kicks out fewer NAs than the whole giant DF.  
   #drop_na() %>% #piecewise needs NAs dropped, 500 points from 84,85,88,00
@@ -49,15 +74,48 @@ RuDensWQsem.No0 = anti_join(RuDensWQsem.all, RmZeros) %>% drop_na() #1323 points
 #spnas= RuDensWQ_spme %>% group_by(year) %>% 
 #  summarise_all(~sum(is.na(.)))
 
+#_NEW RuDens DF Build 1/2021####
+RuDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
+  filter(SpCluster == "Ruppia") %>%
+  filter(!denscomp.max < 1) %>%
+ # filter(!year == "2020") %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+         Temp.spme, Chla.spme, Sal.spme, Secc.spme, TP.spme, TN.spme) %>%
+  drop_na() %>% #1214 points
+  as.data.frame()
 
+#maybe we need to merge them?
+#RuDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
+ # filter(SpCluster %in% c("Ruppia", "ZoRu")) %>% 
+ # group_by(STATION, year) %>% 
+  #select(-dens.percomp.change, -dens.percomp.y1) %>%
+ # mutate(dens.percomp.y11 = sum( )dens.percomp.change1  = sum(dens.weight.mean)/sum(denscomp.max)) %>%
+ # ungroup() %>% 
+ # select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+#         Temp.spme, Chla.spme, Sal.spme, Secc.spme, TP.spme, TN.spme) %>%
+  
+#  drop_na() %>% #1214 points
+#  as.data.frame()
+
+#View(RuDensWQsem.No0_NEW %>% group_by(year) %>% summarise(mean(dens.percomp.y1)))
+
+ggplot() +
+  stat_summary(aes(x = year, y = dens.percomp.change, group = STATION), data = RuDensWQsem.No0, fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .9, color = "brown") +
+  stat_summary(aes(x = year, y = dens.percomp.change, group = STATION), data = RuDensWQsem.No0_NEW, fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .9, alpha = .3, color = "green") +
+  #geom_smooth(aes(x = year, y = dens.percomp.change), method = "lm", size = 1.5, color = "black") +
+  theme_bw(base_size=12) + 
+  ylab("Summer secchi depth (mean)") + xlab("") +
+  scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
 
 
 ##Ruppia Change SEM#####
-#Fisher's C = 4.862 with P-value = 0.302 and on 4 degrees of freedom
-#             Response method Marginal Conditional
-#Chla.spme   none     0.35        0.42
-#Secc.spme   none     0.34        0.74
-#dens.percomp.change   none     0.33        0.38
+#Fisher's C = 1.721 with P-value = 0.787 and on 4 degrees of freedom
+#Response method Marginal Conditional
+#Chla.spme   none     0.36        0.43
+#Secc.spme   none     0.29        0.70
+#dens.percomp.change   none     0.31        0.35
 #
 #NOTES: dpcY1 -> dpc p val = 0.09, so round. bring Sal.spme direct back in for p val = 0.05, but sal then has a direct negative effect on DPC, and there is a negative interaction effect for Secc.spme 
 
@@ -69,7 +127,7 @@ RuppiaChange.sem <- psem(
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.No0),
+                data = RuDensWQsem.No0_NEW),
   Seccsp <- lme(log10(Secc.spme) ~
                   log10(Chla.spme) +
                   log10(Temp.spme) +
@@ -78,28 +136,32 @@ RuppiaChange.sem <- psem(
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.No0),
+                data = RuDensWQsem.No0_NEW),
   RuInt <- lme(dens.percomp.change ~
                  dens.percomp.y1 +
-                # log10(Sal.spme) + 
+               #  log10(Sal.spme) + 
                  log10(Chla.spme) + 
                  log10(TP.spme) +
                  log10(TN.spme) + 
-                 log10(Secc.spme) +
+             #    log10(Secc.spme) +
                  log10(Temp.spme) +
                  (dens.percomp.y1:log10(Sal.spme)) + 
                  (dens.percomp.y1:log10(Chla.spme)) + 
-                 (log10(TP.spme):dens.percomp.y1) +
-                 (log10(TN.spme):dens.percomp.y1) +
-                 (log10(Secc.spme):dens.percomp.y1) +
-                 (log10(Temp.spme):dens.percomp.y1),
+                 (dens.percomp.y1:log10(TP.spme)) +
+                 (dens.percomp.y1:log10(TN.spme))+
+              #   (dens.percomp.y1:log10(Secc.spme)) +
+                 (dens.percomp.y1:log10(Temp.spme)),
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = RuDensWQsem.No0),
-  log10(TN.spme) %~~% log10(TP.spme), log10(Secc.spme) %~~% log10(Sal.spme),
-  log10(Chla.spme) %~~% log10(Sal.spme), log10(TP.spme) %~~% log10(Sal.spme),
-  log10(TN.spme) %~~% log10(Sal.spme), data = RuDensWQsem.No0)
+               data = RuDensWQsem.No0_NEW),
+  log10(TN.spme) %~~% log10(TP.spme), 
+  log10(Secc.spme) %~~% log10(Sal.spme),
+  log10(Chla.spme) %~~% log10(Sal.spme), 
+  log10(TP.spme) %~~% log10(Sal.spme),
+  log10(TN.spme) %~~% log10(Sal.spme), 
+  log10(Chla.spme) %~~% dens.percomp.y1, 
+  data = RuDensWQsem.No0_NEW)
 
 summary(RuppiaChange.sem)
 RuppiaChangeSEM.coeftab = coefs(RuppiaChange.sem) #use this to create table
@@ -107,11 +169,11 @@ dSep(RuppiaChange.sem)
 fisherC(RuppiaChange.sem)
 
 #Ruppia DWM model ####
-#  Fisher's C = 6.192 with P-value = 0.185 and on 4 degrees of freedom
+# Fisher's C = 8.913 with P-value = 0.063 and on 4 degrees of freedom
 #  Response method Marginal Conditional
-#Chla.spme   none     0.35        0.42
+#Chla.spme   none     0.36        0.43
 #Secc.spme   none     0.34        0.74
-#dens.weight.mean   none     0.75        0.78
+#dens.weight.mean   none     0.77        0.79
 
 #NOTES: y1 -> y p=.08, same as above model. Magnitude of Chla.spme*y1 is miniscule, also tiny Temp.spme*y1 negative effect. 0.0001 on each 
 #Unlocked 10/7 to readd the direct effects. Relocked
@@ -124,7 +186,7 @@ RuppiaDWM.sem <- psem(
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = RuDensWQsem.No0),
+                data = RuDensWQsem.No0_NEW),
   Seccsp <- lme(log10(Secc.spme) ~
                   log10(Chla.spme) +
                   log10(Temp.spme) +
@@ -151,43 +213,42 @@ RuppiaDWM.sem <- psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = RuDensWQsem.No0),
+               data = RuDensWQsem.No0_NEW),
   log10(TN.spme) %~~% log10(TP.spme),
   log10(Secc.spme) %~~% log10(Sal.spme),
   log10(Chla.spme) %~~% log10(Sal.spme),
   #log10(Chla.spme) %~~% log10(Secc.spme),
   log10(TP.spme) %~~% log10(Sal.spme),
   log10(TN.spme) %~~% log10(Sal.spme),
-  data = RuDensWQsem.No0)
+  data = RuDensWQsem.No0_NEW)
 
 summary(RuppiaDWM.sem)
 
 qplot(x = log10(Temp.spme)*dens.weight.mean.y1, y = dens.weight.mean, data = RuDensWQsem.No0)
 #RuChange psuedoR2 DWM ####
-RuInt <- lme(dens.percomp.change ~ dens.percomp.y1 +
-               # log10(Sal.spme) + log10(Chla.spme) + 
-               log10(TP.spme) + log10(TN.spme) + log10(Secc.spme) + log10(Temp.spme) +
+RuInt <- lme(dens.percomp.change ~ dens.percomp.y1 + log10(Chla.spme) + 
+               log10(TP.spme) + log10(TN.spme) + log10(Temp.spme) +
                (dens.percomp.y1:log10(Sal.spme)) + (dens.percomp.y1:log10(Chla.spme)) + 
-               (log10(TP.spme):dens.percomp.y1) + (log10(TN.spme):dens.percomp.y1) +
-               (log10(Secc.spme):dens.percomp.y1) + (log10(Temp.spme):dens.percomp.y1),
+               (log10(TP.spme):dens.percomp.y1) + (log10(TN.spme):dens.percomp.y1) + 
+               (log10(Temp.spme):dens.percomp.y1),
              random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1),
-             control = lmeControl(opt = "optim"), data = RuDensWQsem.No0)
+             control = lmeControl(opt = "optim"), data = RuDensWQsem.No0_NEW)
 
 #use that formula to precict area (dens.weight.mean)
 preRuInt <-predict(RuInt) #this lme is the dens.percomp.change
-pred.Rudwm <- preRuInt * RuDensWQsem.No0$denscomp.max
+pred.Rudwm <- preRuInt * RuDensWQsem.No0_NEW$denscomp.max
 
 #prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
 #summary(prdSEM.lm)
 
 RuPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.Rudwm, 
                    random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1),
-                    control = lmeControl(opt = "optim"), data = RuDensWQsem.No0)
+                    control = lmeControl(opt = "optim"), data = RuDensWQsem.No0_NEW)
 
 summary(RuPred.lmer)
-r2(RuPred.lmer)
-#           R2m       R2c
-#[1,] 0.8127525 0.8127563
+rsquared(RuPred.lmer)
+#Response   family     link method  Marginal Conditional
+#1 dens.weight.mean gaussian identity   none 0.7989619   0.7989646
 
 
 #####Ru-Change paper data model####
@@ -691,40 +752,60 @@ View(ZoDensWQ_spme %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
 #ZoDens_WQ= read.csv ("~/Documents/R projects/Predicting-SAV/data/ZoDens_WQ.csv")
 
 ZoDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_69.csv") %>%
-  filter(!STATION %in% c("CB8.1E")) 
+  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3")) #Do this line for 574 instead of 703 points. 
 
 ZoZeros = ZoDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1)) %>%
   dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0)
 
 ZoDensWQ69sem.No0 = anti_join(ZoDensWQ_69, ZoZeros) %>% #for RFs, just run this line
-  select(year, STATION, dens.percomp.change, dens.percomp.y1, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
-         Chla.spmax, Chla.spme, Chla.summed, TP.spme, TN.spmed, TN.spme, TN.spmax, TN.summed, TP.spmed, TP.summed, Secc.summed, Secc.summe, Temp.sumy1med, TSS.summed, Temp.growy1med, Temp.growy1max, Temp.sumy1max, Temp.summe, Temp.summax, Sal.summed, Sal.summe, Temp.spmed, Temp.summed, Temp.spmax, Temp.spme) %>%
+  select(year, STATION, dens.percomp.change, dens.percomp, dens.percomp.y1, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+         Chla.spme, TP.spmed, TN.spmed, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.summed, Temp.spme) %>%
   drop_na() #%>% filter(dens.percomp.change < .5 & dens.percomp.change > -.8) #ideally you want to select the cols that are going to be used and THEN drop_na()
 
-qplot(x = dens.percomp.y1, y = dens.percomp.change, data = ZoDensWQ69sem.No0) + geom_smooth()
+ZoDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
+  filter(SpCluster == "Zostera") %>%
+  filter(!denscomp.max < 1) %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+         Chla.spme, TP.spmed, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>%
+  drop_na() %>% #1214 points
+  as.data.frame()
+
+qplot(x = dens.percomp.y1, y = dens.percomp.change, data = ZoDensWQsem.No0_NEW) + geom_smooth()
 
 #Zostera Change SEM locked####
-#Fisher's C = 3.343 with P-value = 0.911 and on 8 degrees of freedom
+#Fisher's C = 8.366 with P-value = 0.399 and on 8 degrees of freedom
 #Response method Marginal Conditional
-#Chla.spme   none     0.46        0.6
-#dens.percomp.change   none     0.31      0.4
+#Chla.spme   none     0.45        0.60
+#dens.percomp.change   none     0.32        0.44
 
 #NOTES: unlock/relock 10/7 to simplify and improve Chla R2. y1 insignif if Tmep.spme*dpc included, for some weird reason.
 #I DONT SUGGEST UNLOCKING THIS ONE AGAIN
+#1/12/2021: Upon adding the new data, decided to filter out 3 observations from CB3.1E which had basically no grass but was a -.99 DPC. 
 
 ZosteraChange.sem <- psem(
   ChlAspme <- lme(log10(Chla.spme) ~ #NOTE: this doesnt NEED temp
-                 # log10(Temp.spme) +  
+                #  log10(Temp.spme) +  
                     log10(TP.spmed) +
                   log10(TN.spme),
                 random = ~ 1 | STATION,
                 correlation = corARMA(form = ~ 1 | STATION, q = 1),
                 control = lmeControl(opt = "optim"),
-                data = ZoDensWQ69sem.No0),
+                data = ZoDensWQsem.No0_NEW),
+#  Seccsp <- lme(log10(Secc.summe) ~
+ #                 log10(Chla.spme) +
+ #                 log10(Temp.spme) +
+ #                 log10(Sal.summed) +
+ #                 log10(TN.spme) +
+ #                 log10(TP.spmed),
+ #               random = ~ 1 | STATION,
+ #               correlation = corARMA(form = ~ 1 | STATION, q = 1),
+ #               control = lmeControl(opt = "optim"),
+ #               data = ZoDensWQsem.No0_NEW),
   ZoInt <- lme(dens.percomp.change ~
                  dens.percomp.y1 +
                 log10(Temp.sumy1med) + 
-                # log10(Temp.spme) +  this improves mod fit but is positive?
+              #   log10(Temp.spme) + # this improves mod fit but is positive?
                  log10(Sal.summed) + 
                  log10(Chla.spme) + 
                  log10(Secc.summe) +
@@ -735,11 +816,11 @@ ZosteraChange.sem <- psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = ZoDensWQ69sem.No0),
+               data = ZoDensWQsem.No0_NEW),
   log10(TN.spme) %~~% log10(TP.spmed),
   log10(Chla.spme) %~~% log10(Sal.summed),
  log10(Chla.spme) %~~% log10(Secc.summe),
-  data = ZoDensWQ69sem.No0)
+  data = ZoDensWQsem.No0_NEW)
 
 summary(ZosteraChange.sem)
  ZosteraChange.sem = coefs(ZosteraChange.sem)
@@ -747,31 +828,32 @@ dSep(ZosteraChange.sem)
 fisherC(ZosteraChange.sem)
 
 #Zo Change psuedoR2 DWM ####
-ZoInt <- lme(dens.percomp.change ~ dens.percomp.y1  + log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + (dens.percomp.y1:log10(Temp.spme)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)), random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQ69sem.No0)
+ZoInt.lmer <- lme(dens.percomp.change ~ dens.percomp.y1  + log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)), random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQsem.No0_NEW)
+
 
 #use that formula to precict area (dens.weight.mean)
-preZoInt <-predict(ZoInt) #this lme is the dens.percomp.change
-pred.Zodwm <- preZoInt * ZoDensWQ69sem.No0$denscomp.max
+preZoInt <-predict(ZoInt.lmer) #this lme is the dens.percomp.change
+pred.Zodwm <- preZoInt * ZoDensWQsem.No0_NEW$denscomp.max
 
 #prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
 #summary(prdSEM.lm)
 
 ZoPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.Zodwm, 
-                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQ69sem.No0)
+                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQsem.No0_NEW)
 
 summary(ZoPred.lmer)
-r.squaredGLMM(ZoPred.lmer)
-#R2m       R2c
-#[1,] 0.9301029 0.9301039 #NOTE: 89% is dpy1
+rsquared(ZoPred.lmer)
+#Response   family     link method  Marginal Conditional
+#1 dens.weight.mean gaussian identity   none 0.9206766   0.9206769
 
 ##DWM Zostera model Fits like a boss (all Temp.sumy1med)####
 
-qplot(x = dens.weight.mean.y1, y = dens.weight.mean, data = ZoDensWQ69sem.No0) + geom_smooth()
-#Fisher's C = 1.315 with P-value = 0.859 and on 4 degrees of freedom
+qplot(x = dens.weight.mean.y1, y = dens.weight.mean, data = ZoDensWQsem.No0_NEW) + geom_smooth()
+#Fisher's C = 7.657 with P-value = 0.264 and on 6 degrees of freedom
 #          Response method Marginal Conditional
 #Response method Marginal Conditional
-#Chla.spme   none     0.46        0.60
-#dens.weight.mean   none     0.78        0.89
+#Chla.spme   none     0.44        0.59
+#dens.weight.mean   none     0.77        0.88
 
 #NOTE: Massive negative interact effect Temp.sumy1med, everything else tiny
 ZosteraDWM.sem <- psem(
@@ -782,7 +864,7 @@ ZosteraDWM.sem <- psem(
                    random = ~ 1 | STATION,
                    correlation = corARMA(form = ~ 1 | STATION, q = 1),
                    control = lmeControl(opt = "optim"),
-                   data = ZoDensWQ69sem.No0),
+                   data = ZoDensWQsem.No0_NEW),
   ZoInt <- lme(dens.weight.mean ~
                  dens.weight.mean.y1 +
                 # log10(Temp.spmed) +
@@ -799,12 +881,12 @@ ZosteraDWM.sem <- psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = ZoDensWQ69sem.No0),
+               data = ZoDensWQsem.No0_NEW),
   log10(TN.spme) %~~% log10(TP.spmed),
   log10(Chla.spme) %~~% log10(Secc.summe),
   log10(Chla.spme) %~~% log10(Sal.summed),
-  log10(Chla.spme) %~~% dens.weight.mean.y1,
-  data = ZoDensWQ69sem.No0)
+  #log10(Chla.spme) %~~% dens.weight.mean.y1,
+  data = ZoDensWQsem.No0_NEW)
 
 summary(ZosteraDWM.sem)
 ZosteraDWM.sem = coefs(ZosteraDWM.sem)
@@ -968,11 +1050,17 @@ ZoInt_lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + dens.percomp.y1 +
                      log10(TN.spmax) +
                      log10(TP.spmed) + 
                      log10(Secc.summed) +
-                     (dens.percomp.y1:log10(Temp.sumy1med)) + (dens.percomp.y1:log10(Temp.growy1med))+ (dens.percomp.y1:log10(Sal.summed)) + 
+                     (dens.percomp.y1:log10(Temp.sumy1med)) + 
+                     (dens.percomp.y1:log10(Temp.growy1med))+ 
+                     (dens.percomp.y1:log10(Sal.summed)) + 
                      (dens.percomp.y1:log10(Chla.spme)) +
-                     (dens.percomp.y1:log10(TP.spmed)) + (dens.percomp.y1:log10(TN.spmed)) +
-                     (dens.percomp.y1:log10(Secc.summed)) + (1|STATION), data = ZoDensWQ69sem.No0)
+                     (dens.percomp.y1:log10(TP.spmed)) + 
+                     (dens.percomp.y1:log10(TN.spmed)) +
+                     (dens.percomp.y1:log10(Secc.summed)) + 
+                     (1|STATION), data = ZoDensWQ69sem.No0)
+
 summary(ZoInt_lmer)
+coef(ZoInt_lmer)
 car::Anova(ZoInt_lmer, test.statistic = "F")
 check_model(ZoInt_lmer)
 check_zeroinflation(ZoInt_lmer)
@@ -982,6 +1070,8 @@ check_zeroinflation(ZoInt_lmer)
 ###Community 3: Mixed Mesohaline####
 ##
 #
+
+#NOTE: 1/2021 these MM zones got way reduced
 
 #load in MM Change and WQ data
 MixMesoDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/MixMesoDensWQ_69.csv") %>%
@@ -1001,6 +1091,14 @@ MixMesoDensWQ69sem.No0 = anti_join(MixMesoDensWQ_69, MixMesoZeros) %>% #for RFs,
          Secc.summe, Temp.sumy1med, Temp.spmin, Temp.summin, Temp.sumy1min, Temp.summed) %>%
   drop_na() #ideally you want to select the cols that are going to be used and THEN drop_na()
 
+MMDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
+  filter(SpCluster == "MixedMeso") %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+         Chla.summe, Temp.summe, Temp.summin, TP.summe, TN.summe, Sal.sumy1max) %>%
+  drop_na() %>% #161
+  as.data.frame()
+
 #MixMesoDensWQsem.Few0 = MixMesoDensWQsem.dat %>%
  # filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
 #                         "LE3.1", "WT8.3", "CB3.3W")) 
@@ -1012,25 +1110,20 @@ qplot(x = dens.percomp.y1, y = dens.percomp.change, data = MixMesoDensWQ69sem.No
   geom_smooth(method = "lm") #%>% filter(!dens.percomp.y1 == 0))
 
 #MixMesoChange SEM locked####
-#Fisher's C = 4.043 with P-value = 0.4 and on 4 degrees of freedom
-#ADD TN in and: Fisher's C = 0.303 with P-value = 0.86 and on 2 degrees of freedom)
+#Fisher's C = 4.175 with P-value = 0.653 and on 6 degrees of freedom
 #Response method Marginal Conditional
-#Chla.summe   none     0.54        0.66
-#dens.percomp.change   none     0.39        0.43
+#Chla.summe   none     0.35        0.59
+#dens.percomp.change   none     0.40        0.62
   
-#NOTES: .1 p but POSITIVE dpy1 effect, Tempted to try Temp.summe/med? it makes y1->y insig, and reduces R2 by a couple %. Fisher C goes way down to 0.3 but P val is .8. PseudoR2 goes down 2%
-#SEM UNLOCKED 10/5: Simplifying ChlA predictors and using Temp.summin instead of min and max. Changed Sal.sumy1max to Sal.summax but its not great. Temp.summin has a tiny positive direct effect
-#RElocked 10/5
 MixMesoChange.sem <- psem(
   Chlasumax <- lme(log10(Chla.summe) ~
                      log10(Temp.summe) + 
-                     #log10(TP.summax) +
                      log10(TP.summe) +
                      log10(TN.summe),
                    random = ~ 1 | STATION,
                    correlation = corARMA(form = ~ 1 | STATION, q = 1),
                    control = lmeControl(opt = "optim"),
-                   data = MixMesoDensWQ69sem.No0),
+                   data = MMDensWQsem.No0_NEW),
   MMInt <- lme(dens.percomp.change ~
                  dens.percomp.y1 +
               #   log10(Sal.sumy1max) + 
@@ -1046,13 +1139,13 @@ MixMesoChange.sem <- psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = MixMesoDensWQ69sem.No0),
+               data = MMDensWQsem.No0_NEW),
   log10(TN.summe) %~~% log10(TP.summe) ,
  # log10(Temp.summax) %~~% log10(Temp.summin),
-  log10(Chla.summe) %~~% dens.percomp.y1,
+  #log10(Chla.summe) %~~% dens.percomp.y1,
   #log10(Chla.summax) %~~% log10(Sal.sumy1max),
  # log10(TP.summax) %~~% log10(TSS.summe),
-  data = MixMesoDensWQ69sem.No0)
+  data = MMDensWQsem.No0_NEW)
 
 summary(MixMesoChange.sem)
  #
@@ -1095,22 +1188,22 @@ summary(MixMeanso.sem)
 
 
 #Mix Meso PseudoR2 DWM#####
-MMInt <- lme(dens.percomp.change ~ dens.percomp.y1 + log10(Sal.sumy1max) +log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1 +log10(TN.summe):dens.percomp.y1+ log10(Temp.summin):dens.percomp.y1, random = ~ 1 | STATION,correlation = corARMA(form = ~ 1 | STATION, q = 1),control = lmeControl(opt = "optim"),data = MixMesoDensWQ69sem.No0)
+MMInt <- lme(dens.percomp.change ~ dens.percomp.y1 + log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1 +log10(TN.summe):dens.percomp.y1+ log10(Temp.summin):dens.percomp.y1, random = ~ 1 | STATION,correlation = corARMA(form = ~ 1 | STATION, q = 1),control = lmeControl(opt = "optim"),data = MMDensWQsem.No0_NEW)
 
 #use that formula to precict area (dens.weight.mean)
 preMMInt <-predict(MMInt) #this lme is the dens.percomp.change
-pred.MMdwm <- preMMInt * MixMesoDensWQ69sem.No0$denscomp.max
+pred.MMdwm <- preMMInt * MMDensWQsem.No0_NEW$denscomp.max
 
 #prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
 #summary(prdSEM.lm)
 
 MMPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.MMdwm, 
-                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = MixMesoDensWQ69sem.No0)
+                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = MMDensWQsem.No0_NEW)
 
 summary(MMPred.lmer)
-r.squaredGLMM(MMPred.lmer)
-#R2m       R2c                    #-2% Temp.summed, -1%Temp.summe, -2% Sal.summax
-#[1,] 0.6873548 0.6873872
+rsquared(MMPred.lmer)
+#Response   family     link method  Marginal Conditional
+#1 dens.weight.mean gaussian identity   none 0.6956765    0.695756
 
 ##MM TSS Check####
 MixMesoTSS.sem <- psem(
@@ -1162,10 +1255,10 @@ summary(MixMesoTSS.sem)
 
 
 #DWM Mixed meso####
-#Fisher's C = 5.103 with P-value = 0.277 and on 4 degrees of freedom
-#          Response method Marginal Conditional
-#Chla.summax   none     0.54       0.66
-#dens.weight.mean   none     0.69        0.72
+#Fisher's C = 4.113 with P-value = 0.661 and on 6 degrees of freedom
+#Response method Marginal Conditional
+#Chla.summe   none     0.35        0.59
+#dens.weight.mean   none     0.40        0.54
 
 #mostly an interactive Temp.summin, Sal effect, huge POS dwm y1 effect. tiny Chla and temp
 MixMesoDWM.sem <-psem(
@@ -1177,7 +1270,7 @@ MixMesoDWM.sem <-psem(
                    random = ~ 1 | STATION,
                    correlation = corARMA(form = ~ 1 | STATION, q = 1),
                    control = lmeControl(opt = "optim"),
-                   data = MixMesoDensWQ69sem.No0),
+                   data = MMDensWQsem.No0_NEW),
   MMInt <- lme(dens.weight.mean ~
                  dens.weight.mean.y1 +
                  #   log10(Sal.sumy1max) + 
@@ -1193,13 +1286,13 @@ MixMesoDWM.sem <-psem(
                random = ~ 1 | STATION,
                correlation = corARMA(form = ~ 1 | STATION, q = 1),
                control = lmeControl(opt = "optim"),
-               data = MixMesoDensWQ69sem.No0),
+               data = MMDensWQsem.No0_NEW),
   log10(TN.summe) %~~% log10(TP.summe) ,
   # log10(Temp.summax) %~~% log10(Temp.summin),
-  log10(Chla.summe) %~~% dens.weight.mean.y1,
+  #log10(Chla.summe) %~~% dens.weight.mean.y1,
   #log10(Chla.summax) %~~% log10(Sal.sumy1max),
   # log10(TP.summax) %~~% log10(TSS.summe),
-  data = MixMesoDensWQ69sem.No0)
+  data = MMDensWQsem.No0_NEW)
 
 summary(MixMesoDWM.sem)
 
@@ -1280,14 +1373,23 @@ FreshDensWQ69sem.No0 = anti_join(FreshDensWQ_69, FreshZeros) %>% #for RFs, just 
 # filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
 #                         "LE3.1", "WT8.3", "CB3.3W")) 
 
+FreshDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
+  filter(SpCluster == "Fresh") %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+         Chla.summe, Temp.summe, Temp.summax, Temp.sumy1me, TP.summe, TP.summax, TN.summe, Sal.summe, TSS.summe) %>%
+  drop_na() %>% #161
+  mutate(Sal.summe = Sal.summe + .1) %>%
+  as.data.frame()
+
 qplot(y = dens.percomp.change, x = dens.percomp.y1, data = FreshDensWQ69sem.No0) + geom_smooth()
 
 
 #FreshChange SEM locked####
-#Fisher's C = 0.918 with P-value = 0.922 and on 4 degrees of freedom
+#Fisher's C = 3.969 with P-value = 0.41 and on 4 degrees of freedom
 #Response method Marginal Conditional
-#Chla.summe   none     0.22        0.74
-#dens.percomp.change   none     0.29        0.34
+#Chla.summe   none     0.17        0.72
+#dens.percomp.change   none     0.29        0.31
 
 #NOTES: extremely high positive y1 effect, extremely negative Tempsumy1med interactive effect but weirdly a small pos effect of Tempsummed. 
 #Unlocked 10/5: tweaked ChlA to use Temp.summe and TSS.summe. Added TSS.summe to DPC. Temp.sumy1me is best Temp predictor for DPC. Temp.summe as interaction is strongly positive, so keep it out.
@@ -1301,7 +1403,7 @@ FreshChange.sem <- psem(
                     random = ~ 1 | STATION,
                     correlation = corARMA(form = ~ 1 | STATION, q = 1),
                     control = lmeControl(opt = "optim"),
-                    data = FreshDensWQ69sem.No0),
+                    data = FreshDensWQsem.No0_NEW),
   FreshInt <- lme(dens.percomp.change ~
                     dens.percomp.y1 +
                     log10(Sal.summe) + 
@@ -1319,37 +1421,39 @@ FreshChange.sem <- psem(
                   random = ~ 1 | STATION,
                   correlation = corARMA(form = ~ 1 | STATION, q = 1),
                   control = lmeControl(opt = "optim"),
-                  data = FreshDensWQ69sem.No0),
+                  data = FreshDensWQsem.No0_NEW),
  log10(Temp.summe) %~~% log10(Temp.sumy1me),
  log10(Chla.summe) %~~% log10(Temp.sumy1me),
   log10(Chla.summe) %~~% dens.percomp.y1,
-  data = FreshDensWQ69sem.No0)
+  data = FreshDensWQsem.No0_NEW)
 
 summary(FreshChange.sem)
 
+FreshInt <- lmer(dens.percomp.change ~dens.percomp.y1 +log10(Sal.summe) + log10(Chla.summe) + log10(TSS.summe) + log10(TP.summe)  + log10(Temp.sumy1me) +log10(Temp.summe)  +log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 +log10(TSS.summe):dens.percomp.y1+ log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1 + 1|STATION, data = FreshDensWQsem.No0_NEW)
+
 #Fresh Psuedo R2####
-FreshInt <- lme(dens.percomp.change ~dens.percomp.y1 +log10(Sal.summe) + log10(Chla.summe) + log10(TSS.summe) + log10(TP.summe)  + log10(Temp.sumy1me) +log10(Temp.summe)  +log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 +log10(TSS.summe):dens.percomp.y1+ log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1, random = ~ 1 | STATION,correlation = corARMA(form = ~ 1 | STATION, q = 1),control = lmeControl(opt = "optim"), data = FreshDensWQ69sem.No0)
+FreshInt <- lme(dens.percomp.change ~dens.percomp.y1 +log10(Sal.summe) + log10(Chla.summe) + log10(TSS.summe) + log10(TP.summe)  + log10(Temp.sumy1me) +log10(Temp.summe)  +log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 +log10(TSS.summe):dens.percomp.y1+ log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1, random = ~ 1 | STATION,correlation = corARMA(form = ~ 1 | STATION, q = 1),control = lmeControl(opt = "optim"), data = FreshDensWQsem.No0_NEW)
 
 #use that formula to precict area (dens.weight.mean)
 preFreshInt <-predict(FreshInt) #this lme is the dens.percomp.change
-pred.Freshdwm <- preFreshInt * FreshDensWQ69sem.No0$denscomp.max
+pred.Freshdwm <- preFreshInt * FreshDensWQsem.No0_NEW$denscomp.max
 
 #prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
 #summary(prdSEM.lm)
 
 FreshPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.Freshdwm, 
-                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = FreshDensWQ69sem.No0)
+                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = FreshDensWQsem.No0_NEW)
 
 summary(FreshPred.lmer)
-r.squaredGLMM(FreshPred.lmer)
-#R2m       R2c
-#[1,] 0.8983885 0.8983925
+rsquared(FreshPred.lmer)
+#Response   family     link method  Marginal Conditional
+#1 dens.weight.mean gaussian identity   none 0.8990759   0.8990819
 
 #Fresh DWM SEM####
-#Fisher's C = 5.511 with P-value = 0.48 and on 6 degrees of freedom
-#          Response method Marginal Conditional
-#Chla.summe   none     0.21        0.71
-#dens.weight.mean   none     0.86        0.88
+#Fisher's C = 7.198 with P-value = 0.303 and on 6 degrees of freedom
+#Response method Marginal Conditional
+#Chla.summe   none     0.16        0.72
+#dens.weight.mean   none     0.87        0.88
 
 FreshDWM.sem <- psem(
   Chlasummax <- lme(log10(Chla.summe) ~
@@ -1361,7 +1465,7 @@ FreshDWM.sem <- psem(
                     random = ~ 1 | STATION,
                     correlation = corARMA(form = ~ 1 | STATION, q = 1),
                     control = lmeControl(opt = "optim"),
-                    data = FreshDensWQ69sem.No0),
+                    data = FreshDensWQsem.No0_NEW),
   FreshInt <- lme(dens.weight.mean ~
                     dens.weight.mean.y1 +
                    # log10(Sal.summe) + 
@@ -1379,7 +1483,7 @@ FreshDWM.sem <- psem(
                   random = ~ 1 | STATION,
                   correlation = corARMA(form = ~ 1 | STATION, q = 1),
                   control = lmeControl(opt = "optim"),
-                  data = FreshDensWQ69sem.No0),
+                  data = FreshDensWQsem.No0_NEW),
   log10(TN.summe) %~~% log10(TP.summe) ,
   log10(TP.summe) %~~% log10(TP.summax) ,
   log10(Temp.summe) %~~% log10(Temp.summax),
@@ -1387,11 +1491,11 @@ FreshDWM.sem <- psem(
   log10(TP.summe) %~~% dens.weight.mean,
   log10(TP.summax) %~~% dens.weight.mean,
   log10(Temp.summe) %~~% dens.weight.mean,
-  data = FreshDensWQ69sem.No0)
+  data = FreshDensWQsem.No0_NEW)
 
 summary(FreshDWM.sem)
 
-#mess around SEMS
+#####mess around SEMS####
 
 FreshLOG.sem <- psem(
   Chlasummax <- lme(log10(Chla.summe) ~

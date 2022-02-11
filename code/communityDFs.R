@@ -2,6 +2,7 @@
 library(tidyverse); library(readxl)
 
 #load in the Water Quality data. I think most use the 69vars df,
+#CBP.WQ_69vars <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
 #CBP.WQ_combined <- read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 #CBP.WQ_combined = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
@@ -13,6 +14,76 @@ library(tidyverse); library(readxl)
 
 #community.desig = clusters %>% select(STATION, LATITUDE, LONGITUDE, clust.group, clust.no) #now use these clust.group to filter data! 
 
+#NEW!!! 1/20/22: We redid the Overlap w Stations Zones ####
+
+
+AllCommunitiesDensityTime <- readxl::read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/SAV Area by Year by Station Zone and Species Cluster.xlsx")
+Overlap_AllStations <- readxl::read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/SAV Composite with max density by Station, Species Cluster, and Density.xlsx")
+
+#calculate mean area to density conversions: 
+dwm.to.HA_Zo = lm(SAVArea ~ dens.weight.mean, data = SAVCommunityDens_AllStations %>% filter(SpCluster == "Zostera"))
+dwm.to.HA_Ru = lm(SAVArea ~ dens.weight.mean, data = SAVCommunityDens_AllStations %>% filter(SpCluster == "Ruppia"))
+dwm.to.HA_MM = lm(SAVArea ~ dens.weight.mean, data = SAVCommunityDens_AllStations %>% filter(SpCluster == "MixedMeso"))
+dwm.to.HA_F = lm(SAVArea ~ dens.weight.mean, data = SAVCommunityDens_AllStations %>% filter(SpCluster == "Fresh"))
+
+SAVCommunityDens_AllStations %>% group_by(Station, Year) %>% filter(SpCluster == "Zostera") %>%
+  mutate(pred.Area = predict(dwm.to.HA_Zo, newdata = .))
+
+predict(dwm.to.HA_Zo, newdata = )
+
+AllStationsByCommunity <- Overlap_AllStations %>% 
+  group_by(SpCluster) %>%
+  pivot_wider(names_from = Density, values_from = SAV_HA, names_prefix = "SAVdens") %>%
+  group_by(Station, SpCluster) %>%
+ # dplyr::filter(RMZoneSAV_HA > 0) %>% #filter out non-Ruppia: 51 total stations
+  mutate(denscomp.max = (SAVdens4*.85) + (SAVdens3*.55) + (SAVdens2*.25) + (SAVdens1*.05)) %>% #calculate max composite area
+  mutate(SAV_HA.max = SAVdens4+SAVdens3+SAVdens2+SAVdens1) %>%
+  select(Station, SpCluster, denscomp.max, SAV_HA.max)
+
+SAVCommunityDens_AllStations <- AllCommunitiesDensityTime %>%
+  rename(SpCluster = SPCluster) %>%
+  #filter(between(Year, 1990, 2019)) %>% use this if you want to create a certain time dataset
+  mutate(per.cov = case_when(Density == 1 ~ .05,
+                             Density == 2 ~ .25, 
+                             Density == 3 ~ .55, 
+                             Density == 4 ~ .85)) %>% #convert to density weighted means 
+  mutate(dens_cov = Area_HA * per.cov) %>%
+  group_by(SpCluster, Station, Year) %>%
+  summarize(dens.weight.mean = sum(dens_cov), 
+            SAVArea = sum(Area_HA)) %>%
+  mutate(dens.weight.mean.y1 = lag(dens.weight.mean, order_by = Year, k = 1), 
+         SAVArea.y1 = lag(SAVArea, order_by = Year, k = 1)) %>%
+  full_join(AllStationsByCommunity) %>% group_by(Station, SpCluster) %>% 
+  mutate(dens.percomp = dens.weight.mean/denscomp.max, 
+         dens.percomp.y1 = dens.weight.mean.y1/denscomp.max, 
+         SAVArea.percomp = SAVArea/SAV_HA.max, 
+         SAVArea.percomp.y1 = SAVArea.y1/SAV_HA.max) %>% 
+  mutate(dens.percomp.change = (dens.percomp-dens.percomp.y1), 
+         SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
+  select(SpCluster, Station, Year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max, SAV_HA.max) %>%
+  filter(!denscomp.max < 1) #filter out teenie stations? if not this, == 0 so at least get the 0s out
+
+#New MASTER Bay Community SAV Dataset!!!#####
+write_csv(SAVCommunityDens_AllStations, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommunityDens_AllStations.csv")
+write_csv(SAVCommunityDens_AllStations, "~/Documents/R projects/Predicting-SAV/data/SAVCommunityDens_AllStations.csv")
+
+CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+CBP.WQ_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+
+SAVCommDensWQ_69 <- SAVCommunityDens_AllStations %>%
+  rename(year = Year, STATION = Station) %>%
+  left_join(CBP.WQ_69vars)
+
+#nacheck
+#View(SAVCommDensWQ_69 %>% group_by(year) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))) %>%
+ # select(STATION, year, dens.percomp.change, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe))
+
+#New MASTER Bay SAV Density and WQ Dataset!!!#####
+#write_csv(SAVCommDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
+#write_csv(SAVCommDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
+
+#THIS IS NOT NEEDED ANYMORE#########
 #
 ##
 ###
@@ -23,6 +94,7 @@ library(tidyverse); library(readxl)
 #load in data to make SAV density over time per zone DF
 RuppiaOverlap_StationZone <- read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Ruppia SAV Zones Overlap with Station Zones.xlsx")
 
+
 ####NOTE: NEED TO REDO THIS ABOVE FROM THE SAV AREA BY YEAR BY STATION ZONE FILE BECAUSE WE ARENT GOING TO BE UPDATING TO 2020, THIS ABOVE FILE####
 
 RuppiaStations <- RuppiaOverlap_StationZone %>% 
@@ -31,7 +103,7 @@ RuppiaStations <- RuppiaOverlap_StationZone %>%
   select(STATION, denscomp.max, RMZoneSAV_HA) #clean up this DF
 
 #load in SAV area by year for Rupppia stations
-RuppiaDensityTime <- read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Ruppia SAV Area by Year by Station Zone.xlsx")
+RuppiaDensityTime <- readxl::read_excel("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Ruppia SAV Area by Year by Station Zone.xlsx")
 
 #calculate Ruppia coverage in each station zone for each year and year - 1
 #response variables created here: 
@@ -61,6 +133,8 @@ RuDensTime <- RuppiaDensityTime %>%
          SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
   rename("year" = "Year") %>% 
   select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
+
+
 
 #Full DF all Stations. Use spring data instead, SKIP THIS####
 #Here is I recommend not using this DF (even simp): when we drop_na() for the sem, there are too many chances for a dumb NA kick out (e.g., who cares if this one datapoint didnt have a TN.sumy1ran??)
@@ -168,6 +242,8 @@ ZoDensTime <- ZosteraDensityTime %>%
          SAVArea.percomp.change = (SAVArea.percomp-SAVArea.percomp.y1)) %>% 
   rename("year" = "Year") %>% 
   select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max)
+
+write_csv(ZoDensTime, "~/Documents/R projects/Predicting-SAV/data/ZoDensTime.csv")
 
 hist(ZoDensTime %>% filter(dens.weight.mean > 0) %>% pull(dens.weight.mean))
 

@@ -1,14 +1,14 @@
 #exploring the projected data 
-library(tidyverse); library(readxl)
+library(tidyverse); library(readxl); library(lubridate)
 
 #load CB 5.4 base
-######Reading in code (Used Daves though)####
+#Reading in code (Use Daves not this)####
 base_cb5.4 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/Base_Chris/Base_1991_2000_CB5.4.csv", sep = "", header = T)
 
 #load CB 5.4 something else 
 
 fiftytosixty_cb5.4 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/CC55_WithLandUseChange_2051_2060/CC55_WithLandUseChange_2051_2060_CB5.4.csv", sep = "", header = T)
-
+#####Daves read in code####
 
 library(data.table)
 
@@ -57,7 +57,7 @@ for (i in 1:length(file_list)){
 
 ######
   
-#Tidy projected dataframe#####
+#Tidy projected dataframes, Baseline, CC.wl, WIP WIP#####
 
 #Baseline 1991-2000 dataframe####
 baseline_all = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/Base_Chris.csv")
@@ -119,9 +119,11 @@ CC55.wland = CC55.wland_all %>%
   summarize(across(Depth:TP, mean)) %>%
   mutate(Year = Year + 60) %>% ungroup() 
 
+#CC.wland_2021_2060####
 #bind them all toghether
 CC.wland_2021_2060 = bind_rows(CC25.wland, CC35.wland) %>%
-  bind_rows(CC45.wland) %>% bind_rows(CC55.wland)
+  bind_rows(CC45.wland) %>% bind_rows(CC55.wland) %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
 
 ggplot(data = CC.wland_2021_2060) +
   stat_summary(aes(x = Year, y = Temp), geom = "smooth", fun = max)
@@ -173,9 +175,11 @@ WIP55.wland = WIP55.wland_all %>%
   summarize(across(Depth:TP, mean)) %>%
   mutate(Year = Year + 60) %>% ungroup() 
 
+
 #bind them all toghether
 WIP.wland_2021_2060 = bind_rows(WIP25.wland, WIP35.wland) %>%
-  bind_rows(WIP45.wland) %>% bind_rows(WIP55.wland)
+  bind_rows(WIP45.wland) %>% bind_rows(WIP55.wland) %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
 
 WIPwcb1.1TN = WIP.wland_2021_2060 %>% filter(Station == "CB1.1") #%>% select(Day, Month, Year, TN)
 
@@ -226,11 +230,398 @@ WIP55.woland = WIP55.woland_all %>%
 
 #bind them all toghether
 WIP.woland_2031_2060 = bind_rows(WIP35.woland, WIP45.woland) %>%
-  bind_rows(WIP55.woland)
+  bind_rows(WIP55.woland) %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
 
 WIPwocb1.1TN = WIP.woland_2031_2060 %>% filter(Station == "CB1.1") #%>% select(Day, Month, Year, TN)
 
-###Build temporal variable dataframes 
+
+
+###DO DAILY MATCHUPS!!!: 1/24/2021####
+#Shouldnt need to re-run above. some read.csvs below can load it in
+
+#write_csv(CC.wland_2021_2060, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/CC.wland_2021_2060.csv")
+#write_csv(WIP.wland_2021_2060, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/WIP.wland_2021_2060.csv")
+#write_csv(WIP.woland_2031_2060, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/WIP.woland_2031_2060.csv")
+#write_csv(baseline, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/baseline.csv")
+
+#READ THIS FIRST####
+#Major change in the workflow where we dont do the summarizing right away. Follow this workflow now:
+#CC.wland_2021_2060 (created already, above) and baseline_Dprep (created below) get daily matched up to create CC.wland_D, which are daily differences in the baseline and the future (i.e., June 11 2028 - June 11 1990 = one possible future scalar. June 11 2040 - June 11 1993 is also a possible scalar). This creates CC.wland_ProjPrep which then is CC.wland_summerPP and springPP. Still PP (ProjPrep) because these are still DAILY. Very Important change!
+#
+
+#"no climate change" scenario ####
+#This is assuming that 2021-2060 will just basically be randomly drawn from the past data that we have from CBP 1984-2020. future projections from real CBP Data, randomly drawn as NO CC#
+#NOTE: 1984-1987 have NAs that could cause problems. Also, spring 2020 data is incomplete because of covid
+
+CBPall = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv")
+
+FutureYears = as_tibble(seq(from = 2021, to = 2060, by = 1)) %>% rename("Year" = "value")
+
+CBPall_Future = CBPall %>% 
+  rename("Station" = "STATION") %>% #rename to match w projction data
+  select(Station:Chla) %>% #we dont need the .D variables
+  #filter(Station %in% c("EE3.1")) %>% #check a few stations if you want
+  drop_na() %>% #drops 20,000 points
+  group_by(Station, year) %>% #
+  mutate(day = day(date)) %>%
+  mutate(DM = format(as.Date(date), "%m-%d")) %>%
+  select(Station, date, DM, year, month, day, TN:Chla)
+#the combo of data gaps and drop NAs and random sampling means that we have not the full years of data for the future. (I fixed this eventually)
+
+#View(CBPall_Future %>% group_by(Station) %>% summarize(unique(year)))
+#CBPall %>% filter(STATION == "EE3.1" & year == 1997) %>% select(month, Temp)
+
+CC.wland_2021_2060 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/CC.wland_2021_2060.csv") %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
+WIP.wland_2021_2060 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/WIP.wland_2021_2060.csv") %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
+WIP.woland_2031_2060 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/WIP.woland_2031_2060.csv") %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
+baseline = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/baseline.csv") %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day))
+
+#baseline
+#CC.wland_2021_2060
+#WIP.wland_2021_2060
+#WIP.woland_2031_2060
+
+#CC.wland_2021_2060 %>% filter(Station == "LE5.4") %>% filter(Year == 2048) %>% filter(Month == 12) %>% filter(Day == 15) 
+
+#Next, create the Delta dataset for each scenario, Predictions - Baseline####
+#Should i do a NoCC too?
+
+#baseline_Dprep####
+#Baseline df just repeated 4 total times: 
+baseline25 = baseline %>% 
+  mutate(Year = Year + 30)
+baseline35 = baseline %>%
+  mutate(Year = Year + 40)
+baseline45 = baseline %>%
+  mutate(Year = Year + 50)
+baseline55 = baseline %>%
+  mutate(Year = Year + 60)
+
+baseline_Dprep = bind_rows(baseline25, baseline35, baseline45, baseline55) %>%
+  mutate(Date = make_date(year = Year, month = Month, day = Day)) 
+
+#CC.wland_D####
+#This takes like 15 mins to run
+CC.wland_D = CC.wland_2021_2060 %>% #%>% filter(Station == "LE5.4") %>% check a station
+  bind_rows(baseline_Dprep) %>% #%>% filter(Station == "LE5.4")) %>% 
+  select(Date, Year, Month, Day, Station, everything()) %>% 
+  arrange(Station, Date) %>% #idk if needed
+  group_by(Station, Date) %>%
+  summarise(across(Depth:TP, ~.x - lead(.x, order_by = Date))) %>%
+  drop_na() #for some reason, a row of NAs gets built for each station/date. which is making the DF 4 million to start before dropping
+
+
+#WIP.wland_D####
+WIP.wland_D = WIP.wland_2021_2060 %>%
+  bind_rows(baseline_Dprep) %>% #group_by(Station) %>%
+  select(Date, Year, Month, Day, Station, everything()) %>%
+  arrange(Station, Date) %>% #idk if needed
+  group_by(Station, Date) %>%
+  summarise(across(Depth:TP, ~.x - lead(.x, order_by = Date))) %>%
+  drop_na()
+
+#WIP.woland_D####
+WIP.woland_D = WIP.woland_2031_2060 %>%
+  bind_rows(baseline_Dprep) %>% 
+ # filter(Date %in% CBPall_Future$Date) %>% 
+  select(Date, Year, Month, Day, Station, everything()) %>%
+  arrange(Station, Date) %>% #idk if needed
+  group_by(Station, Date) %>%
+  summarise(across(Depth:TP, ~.x - lead(.x, order_by = Date))) %>%
+  drop_na()
+  
+#Put it all together: ####
+
+#Then, create Projection Prepared dataframes####
+#create a DF of all the possible daily matchup predictions, where CC.wland is the climate projection DELTA, and CBP all future is the No Climate Change data. 
+CC.wland_ProjPrep = CC.wland_D %>% 
+  mutate(day = day(Date), month = month(Date), year = year(Date)) %>%
+  mutate(DM = format(as.Date(Date), "%m-%d")) %>%
+  left_join(CBPall_Future %>% 
+            filter(! year %in% c(2020)) ,  #2020 has incomplete data so remove for now
+            by = c("Station", "DM")) %>% #.y = NoCC data, .x = delta. So should be .y + .x 
+  drop_na() %>% #like 50K points per station over time.
+  group_by(Station, DM) %>%
+  mutate(Temp = Temp.y + Temp.x, 
+         Sal = Sal.y + Sal.x, 
+         Secc = Secc.y + Secc.x, 
+         Chla = Chla.y + Chla.x, 
+         TN = TN.y + TN.x, 
+         TP = TP.y + TP.x) %>%
+  select(Station, DM, year.x, year.y, month.x, Temp:TP) %>% 
+  mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup() #this is just all of the possible things to pull 40 years worth of data from. 
+
+
+CC.wland_summerPP = CC.wland_ProjPrep %>% 
+  filter(dplyr::between(month.x, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+CC.wland_springPP = CC.wland_ProjPrep %>%  
+  filter(dplyr::between(month.x, 3, 6)) %>% #late june isnt spring.... 
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+#run these next 4 DFs to get the CC.wland_OneFuture
+####twentyone code####
+twentyone = CBP.WQ_69vars %>% filter(year == "2020") %>%
+  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
+  group_by(STATION) %>%
+  #slice_sample(n = 1 , replace = T) %>% #pick a random year
+  mutate(Year = case_when(year == 2020 ~ 2021)) %>% #change year, bc y being changed to y1
+  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
+  rename(Station = STATION) %>%
+  select(Station, Year, everything()) %>% select(-year) %>% 
+  replace_na(list(Temp.sumy1me = 31.2550, Temp.sumy1med = 31.2550, Sal.sumy1max = 0.001)) %>% 
+  ungroup() 
+
+####Create CC.wland_AllFutures####
+CC.wland_AllFutures = left_join(CC.wland_summerPP, CC.wland_springPP) %>% 
+  select(-year.y) %>% 
+  rename("Year" = "year.x")
+
+write.csv(CC.wland_AllFutures, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wland_AllFutures.csv")
+CC.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wland_AllFutures.csv")
+
+####Create CC.wland_OneFuture####
+CC.wland_OneFuture.no2021 = CC.wland_AllFutures %>% 
+  group_by(Station, Year) %>% 
+  slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+
+CC.wland_One2021 = CC.wland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+CC.wland_OneFuture = CC.wland_OneFuture.no2021 %>% 
+  filter(!Year == "2021") %>%
+  bind_rows(CC.wland_One2021) %>% 
+  ungroup() %>%
+  arrange(Station, Year)
+
+
+###WIP wland####
+WIP.wland_ProjPrep = WIP.wland_D %>% #this takes a few mins to run
+  mutate(day = day(Date), month = month(Date), year = year(Date)) %>%
+  mutate(DM = format(as.Date(Date), "%m-%d")) %>%
+  left_join(CBPall_Future %>% 
+              filter(! year %in% c(2020)) ,  #2020 has incomplete data so remove for now
+            by = c("Station", "DM")) %>% #.y = NoCC data, .x = delta. So should be .y + .x 
+  drop_na() %>% #like 50K points per station over time.
+  group_by(Station, DM) %>%
+  mutate(Temp = Temp.y + Temp.x, 
+         Sal = Sal.y + Sal.x, 
+         Secc = Secc.y + Secc.x, 
+         Chla = Chla.y + Chla.x, 
+         TN = TN.y + TN.x, 
+         TP = TP.y + TP.x) %>%
+  select(Station, DM, year.x, year.y, month.x, Temp:TP) %>% 
+  mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup() #this is just all of the possible things to pull 40 years worth of data from. 
+
+
+WIP.wland_summerPP = WIP.wland_ProjPrep %>% 
+  filter(dplyr::between(month.x, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+WIP.wland_springPP = WIP.wland_ProjPrep %>%  
+  filter(dplyr::between(month.x, 3, 6)) %>% #late june isnt spring.... 
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+#run these next 4 DFs to get the WIP.wland_OneFuture
+####twentyone code####
+twentyone = CBP.WQ_69vars %>% filter(year == "2020") %>%
+  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
+  group_by(STATION) %>%
+  #slice_sample(n = 1 , replace = T) %>% #pick a random year
+  mutate(Year = case_when(year == 2020 ~ 2021)) %>% #change year, bc y being changed to y1
+  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
+  rename(Station = STATION) %>%
+  select(Station, Year, everything()) %>% select(-year) %>% 
+  replace_na(list(Temp.sumy1me = 31.2550, Temp.sumy1med = 31.2550, Sal.sumy1max = 0.001)) %>% 
+  ungroup() 
+
+####Create WIP.wland_AllFuture####
+WIP.wland_AllFutures = left_join(WIP.wland_summerPP, WIP.wland_springPP) %>% 
+  select(-year.y) %>% 
+  rename("Year" = "year.x")
+
+write.csv(WIP.wland_AllFutures, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wland_AllFutures.csv")
+WIP.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wland_AllFutures.csv")
+
+####Create WIP.wland_OneFuture####
+WIP.wland_OneFuture.no2021 = WIP.wland_AllFutures %>% 
+  group_by(Station, Year) %>% 
+  slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+
+WIP.wland_One2021 = WIP.wland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+WIP.wland_OneFuture = WIP.wland_OneFuture.no2021 %>% 
+  filter(!Year == "2021") %>%
+  bind_rows(WIP.wland_One2021) %>% 
+  ungroup() %>%
+  arrange(Station, Year)
+
+###WIPwoland####
+#be careful here bc it dont start till 2030
+WIP.woland_ProjPrep = WIP.woland_D %>% 
+  mutate(day = day(Date), month = month(Date), year = year(Date)) %>%
+  mutate(DM = format(as.Date(Date), "%m-%d")) %>%
+  left_join(CBPall_Future %>% 
+              filter(! year %in% c(2020)) ,  #2020 has incomplete data so remove for now
+            by = c("Station", "DM")) %>% #.y = NoCC data, .x = delta. So should be .y + .x 
+  drop_na() %>% #like 50K points per station over time.
+  group_by(Station, DM) %>%
+  mutate(Temp = Temp.y + Temp.x, 
+         Sal = Sal.y + Sal.x, 
+         Secc = Secc.y + Secc.x, 
+         Chla = Chla.y + Chla.x, 
+         TN = TN.y + TN.x, 
+         TP = TP.y + TP.x) %>%
+  select(Station, DM, year.x, year.y, month.x, Temp:TP) %>% 
+  mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup() #this is just all of the possible things to pull 40 years worth of data from. 
+
+
+WIP.woland_summerPP = WIP.woland_ProjPrep %>% 
+  filter(dplyr::between(month.x, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+WIP.woland_springPP = WIP.woland_ProjPrep %>%  
+  filter(dplyr::between(month.x, 3, 6)) %>% #late june isnt spring.... 
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+#run these next 4 DFs to get the CC.wland_OneFuture Iteration happens here
+####twentyone code####
+twentyone = CBP.WQ_69vars %>% filter(year == "2020") %>%
+  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
+  group_by(STATION) %>%
+  #slice_sample(n = 1 , replace = T) %>% #pick a random year
+  mutate(Year = case_when(year == 2020 ~ 2031)) %>% #change year, bc y being changed to y1
+  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
+  rename(Station = STATION) %>%
+  select(Station, Year, everything()) %>% select(-year) %>% 
+  replace_na(list(Temp.sumy1me = 31.2550, Temp.sumy1med = 31.2550, Sal.sumy1max = 0.001)) %>% 
+  ungroup() 
+
+####Create WIP.woland_AllFuture####
+WIP.woland_AllFutures = left_join(WIP.woland_summerPP, WIP.woland_springPP) %>% 
+  select(-year.y) %>% 
+  rename("Year" = "year.x")
+
+write.csv(WIP.woland_AllFutures, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
+WIP.woland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
+
+####Create WIP.woland_OneFuture####
+WIP.woland_OneFuture.no2031 = WIP.woland_AllFutures %>% 
+  group_by(Station, Year) %>% 
+  slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+
+WIP.woland_One2031 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2031") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+WIP.woland_OneFuture = WIP.woland_OneFuture.no2031 %>% 
+  filter(!Year == "2031") %>%
+  bind_rows(WIP.woland_One2031) %>% 
+  ungroup() %>%
+  arrange(Station, Year)
+
+
+
+###OBSOLETE CODE after 1/26######
 
 #Build Temporal variable DFs, reminder that 69 Vars has longer grow and spring####
 #baseline_1990-2000####

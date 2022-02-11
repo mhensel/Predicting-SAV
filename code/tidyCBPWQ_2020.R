@@ -169,7 +169,7 @@ CBPnas= CBPall %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
 View(CBPnas)
 
 #write it back into the R drive
-#write_csv(CBPall, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBPall_2020.csv")
+#write_csv(CBPall, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv")
 #write_csv(CBPall, "~/Documents/R projects/Predicting-SAV/data/CBPall_2020.csv")
 
 #visualize one
