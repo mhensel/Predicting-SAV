@@ -642,7 +642,7 @@ bigZoWIPdatalist = list()
 
 ##MULTIVERSAL LOOP 1: Zos_WIP.wland_Predict####
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   ####Create WIP.wland_OneFuture####
   #
@@ -738,7 +738,7 @@ for (t in 1:100){ #eventually this is 1:1000
 Zo_WIP.wland_Predict = bigZoWIPdatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
-write.csv(Zo_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/Zo_WIP.wland_Predict.csv")
+write.csv(Zo_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Zo_WIP.wland_Predict.csv")
 
 gc(Zo_WIP.wland_Predict)
 
@@ -747,7 +747,7 @@ gc(Zo_WIP.wland_Predict)
 
 bigRuWIPdatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   ####Create WIP.wland_OneFuture####
   #Iteration should start here! 
@@ -844,7 +844,7 @@ for (t in 1:100){ #eventually this is 1:1000
 Ru_WIP.wland_Predict = bigRuWIPdatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
-write.csv(Ru_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/Ru_WIP.wland_Predict.csv")
+write.csv(Ru_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Ru_WIP.wland_Predict.csv")
 
 gc(Ru_WIP.wland_Predict)
 
@@ -853,7 +853,7 @@ gc(Ru_WIP.wland_Predict)
 
 bigMMWIPdatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   #Create WIP.wland_OneFuture_MIXMESO####
   #Iteration should start here! 
@@ -948,7 +948,7 @@ MM_WIP.wland_Predict = bigMMWIPdatalist %>%
 #HUGE DATA ALERT####
 #biglist, not needed anymore.
 
-write.csv(MM_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/MM_WIP.wland_Predict.csv")
+write.csv(MM_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/MM_WIP.wland_Predict.csv")
 
 
 ##MULTIVERSAL LOOP 4: F_WIP.wland_Predict####
@@ -970,7 +970,7 @@ FInt.lmer <- lmer(dens.percomp.change ~dens.percomp.y1 +log10(Sal.summe) + log10
 
 bigFdatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   #Create WIP.wland_OneFuture_Fresh####
   #Iteration should start here! 
@@ -1068,464 +1068,11 @@ F_WIP.wland_Predict = bigFdatalist %>%
 #biglist, not needed anymore.
 gc(bigFdatalist)
 
-write.csv(F_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/F_WIP.wland_Predict.csv")
+write.csv(F_WIP.wland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/F_WIP.wland_Predict.csv")
 
 
 ###
 ####
-#####
-######SCENARIO 3 WIP_woland####
-#####
-####
-###
-
-######this is the one scenario that does need a little tweaking
-####DFs needed for loop but not in loop####
-##Universal DF: twentyone####
-#2021_CBP all##
-thirtyone = CBP.WQ_69vars %>%  #twentyone should work for all Communities
-  filter(year == "2020") %>%
-  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
-  group_by(STATION) %>%
-  mutate(Year = case_when(year == 2020 ~ 2031)) %>% #change year, bc y being changed to y1
-  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
-  rename(Station = STATION) %>%
-  select(Station, Year, everything()) %>% select(-year) %>% 
-  replace_na(list(Temp.sumy1me = 31.2550, Temp.sumy1med = 31.2550, Sal.sumy1max = 0.001)) %>% 
-  ungroup() 
-#future years, used in loop
-future_yrs.WIPwo = seq(2030, 2060, by = 1) 
-
-#Scenario Global DF####
-#This is same for all WIP.wolands. Replace for each scenario
-WIP.woland_AllFutures = read.csv("r:/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
-
-#Community Initial Density DF####
-
-bigZoWIPwodatalist = list()
-
-##MULTIVERSAL LOOP 1: Zos_WIP.woland_Predict####
-
-for (t in 1:100){ #eventually this is 1:1000
-  
-  ####Create WIP.woland_OneFuture####
-  #
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
-           Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
-           Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  #Filter out 
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2031") %>% 
-    select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
-    full_join(thirtyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2031") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  #everythnig above this is the same for all communities
-  Zos_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Zostera_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.spme, TP.spmed, TN.spme, Secc.summe, 
-           Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>% #select the Zostera WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(Zostera_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    mutate(year = case_when(year == 2020 ~ 2030, 
-                            TRUE ~ year)) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  #i name this Rudatalist in the other loops but dont wanna mess
-  ZoWIPwodatalist = list()
-  
-  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    
-    #subset data by site
-    siteenvdata <- Zos_WIP.woland_OneFuture[Zos_WIP.woland_OneFuture$STATION == zos_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs.WIPwo)) { #HERE is basically why i needed the for loop, to start on 2:
-      #y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      
-      
-      #col 11 in CYP = dens.percomp | col 11 in siteenvdata
-      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
-      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
-      
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
-      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
-      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.mean
-      
-      #add a case_when so no 0s?
-      
-    }
-    
-    ZoWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(ZoWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigZoWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now what
-
-Zo_WIP.woland_Predict = bigZoWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-#HUGE DATA ALERT####
-#biglist, not needed anymore.
-gc(Zo_WIP.woland_Predict)
-
-write.csv(Zo_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Zo_WIP.woland_Predict.csv")
-
-##MULTIVERSAL LOOP 2: Ru_WIP.woland_Predict####
-####DFs needed for loop but not in loop#
-ru_station = Ruppia_initialDPC$STATION
-
-#####
-
-bigRuWIPwodatalist = list()
-
-for (t in 1:100){ #eventually this is 1:1000
-  
-  ####Create WIP.woland_OneFuture#
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) #%>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-  
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2031") %>% 
-    #select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
-    full_join(thirtyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2031") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  #everythnig above this is the same for all communities
-  Ru_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Ruppia_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.spme, TP.spme, TN.spme, Sal.spme, Temp.spme) %>% #select the Ruppia WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(Ruppia_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    mutate(year = case_when(year == 2020 ~ 2030, 
-                            TRUE ~ year)) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  # FIX NA's IN THE PREDICTED CLIMATE MATRIX BEFORE GOING TO NEXT LOOP
-  
-  RuWIPwodatalist = list()
-  
-  for(s in 1:length(ru_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- Ru_WIP.woland_OneFuture[Ru_WIP.woland_OneFuture$STATION == ru_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs.WIPwo)) { #HERE is basically why i needed the for loop, to start on 2:
-      #y = 3
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y-1],8] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 8 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(RuInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      
-      
-      #col 8 in CYP = dens.percomp | col 8 in siteenvdata
-      #col 10 in CYP = dens.percomp.change | col 10 in siteenvdata 
-      #col 11 in CYP = dens.weight.mean | col 11 in siteenvdata 
-      
-      siteenvdata[y,8] <- CurrentYrPredict[1,8] #dens.percomp
-      siteenvdata[y,10] <- CurrentYrPredict[1,10] #dens.percomp.change
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.weight.mean
-      
-      #add a case_when so no 0s?
-      
-    }
-    
-    RuWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(RuWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigRuWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-Ru_WIP.woland_Predict = bigRuWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-#HUGE DATA ALERT####
-#biglist, not needed anymore.
-gc(Ru_WIP.woland_Predict)
-
-write.csv(Ru_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Ru_WIP.woland_Predict.csv")
-#59393 / 1804000 #97% of the ruppia change is between
-
-##MULTIVERSAL LOOP 3: MM_WIP.woland_Predict####
-
-bigMMWIPwodatalist = list()
-
-for (t in 1:100){ #eventually this is 1:1000
-  
-  #Create WIP.woland_OneFuture_MIXMESO####
-  #Iteration should start here! 
-  #MixMeso has sumy1max y1 so dont need to do these muttates
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year)) #, 
-  #       Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
-  #       Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2031") %>% 
-    select(-Sal.sumy1max) %>% #, -Temp.sumy1me, -Temp.sumy1med) %>%
-    full_join(thirtyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2031") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  MM_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% MixMeso_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.summe, Temp.summe, Temp.summin, TP.summe, TN.summe, Sal.sumy1max) %>% #select the MixMeso WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(MixMeso_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    mutate(year = case_when(year == 2020 ~ 2030, 
-                            TRUE ~ year)) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  MMWIPwodatalist = list()
-  
-  for(s in 1:length(MM_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- MM_WIP.woland_OneFuture[MM_WIP.woland_OneFuture$STATION == MM_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs.WIPwo)) { #HERE is basically why i needed the for loop, to start on 2:
-      #  y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y-1],9] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(MMInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
-      #col 11 in CYP = dens.percomp.change | col 11 in siteenvdata 
-      #col 12 in CYP = dens.weight.mean | col 12 in siteenvdata 
-      
-      siteenvdata[y,9] <- CurrentYrPredict[1,9] #dens.percomp 
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp.change
-      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.weight.mean
-      
-    }
-    
-    MMWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(MMWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigMMWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now wha
-
-
-MM_WIP.woland_Predict = bigMMWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-#HUGE DATA ALERT####
-#biglist, not needed anymore.
-gc(MM_WIP.woland_Predict)
-
-write.csv(MM_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/MM_WIP.woland_Predict.csv")
-
-#
-##MULTIVERSAL LOOP 4: F_WIP.woland_Predict####
-####DFs needed for loop but not in loop#
-
-bigFWIPwodatalist = list()
-
-for (t in 1:100){ #eventually this is 1:1000
-  
-  #Create WIP.woland_OneFuture_Fresh####
-  #Iteration should start here! 
-  #Fresh has sumy1max y1 so dont need to do these muttates
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year))
-  #     Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year)),  
-  #     Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2031") %>% 
-    select(-Temp.sumy1me) %>% #, -Temp.sumy1med, -Sal.sumy1max) %>% ) %>%
-    full_join(thirtyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2031") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  F_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Fresh_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.summe, Temp.summe, Temp.summax, Temp.sumy1me, TP.summe, TN.summe, Sal.summe) %>% #select the Fresh WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(Fresh_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    mutate(Sal.summe = Sal.summe + .001) %>%
-    mutate(year = case_when(year == 2020 ~ 2030, 
-                            TRUE ~ year)) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  # FIX NA's IN THE PREDICTED CLIMATE MATRIX BEFORE GOING TO NEXT LOOP
-  
-  FWIPwodatalist = list()
-  
-  for(s in 1:length(F_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- F_WIP.woland_OneFuture[F_WIP.woland_OneFuture$STATION == F_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs.WIPwo)) { #HERE is basically why i needed the for loop, to start on 2:
-      #  y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y-1],10] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs.WIPwo[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(FInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
-      #col 11 in CYP = dens.percomp.change | col 11 in siteenvdata 
-      #col 12 in CYP = dens.weight.mean | col 12 in siteenvdata 
-      
-      siteenvdata[y,10] <- CurrentYrPredict[1,10] #dens.percomp 
-      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.percomp.change
-      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.weight.mean
-      
-    }
-    
-    FWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(FWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigFWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now what
-
-
-F_WIP.woland_Predict = bigFWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-#HUGE DATA ALERT####
-#biglist, not needed anymore.
-gc(F_WIP.woland_Predict)
-
-write.csv(F_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/F_WIP.woland_Predict.csv")
 
 ###
 ####
@@ -1558,7 +1105,7 @@ bigZoWIPwodatalist = list()
 
 ##MULTIVERSAL LOOP 1: Zos_WIP.woland_Predict####
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   ####Create WIP.woland_OneFuture####
   #
@@ -1659,18 +1206,17 @@ Zo_WIP.woland_Predict = bigZoWIPwodatalist %>%
   map_dfr(as.tibble, .name_repair = "universal")
 
 
-write.csv(Zo_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/Zo_WIP.woland_Predict.csv")
+write.csv(Zo_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Zo_WIP.woland_Predict.csv")
 
 gc(bigZoWIPwodatalist)
 
 ##MULTIVERSAL LOOP 2: Ru_WIP.woland_Predict####
 ####DFs needed for loop but not in loop#
 
-#####
 
 bigRuWIPwodatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   ####Create WIP.woland_OneFuture####
   
@@ -1768,7 +1314,7 @@ for (t in 1:100){ #eventually this is 1:1000
 Ru_WIP.woland_Predict = bigRuWIPwodatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
-write.csv(Ru_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/Ru_WIP.woland_Predict.csv")
+write.csv(Ru_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/Ru_WIP.woland_Predict.csv")
 
 gc(bigRuWIPwodatalist)
 ##MULTIVERSAL LOOP 3: MM_WIP.woland_Predict####
@@ -1777,7 +1323,7 @@ gc(bigRuWIPwodatalist)
 
 bigMMWIPwodatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   #Create WIP.woland_OneFuture_MIXMESO####
   #Iteration should start here! 
@@ -1868,9 +1414,11 @@ for (t in 1:100){ #eventually this is 1:1000
 
 #lol ok now what
 
-
+#bid DATA ALERT####
 MM_WIP.woland_Predict = bigMMWIPwodatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
+
+write.csv(MM_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/MM_WIP.woland_Predict.csv")
 
 
 ##MULTIVERSAL LOOP 4: F_WIP.woland_Predict####
@@ -1878,7 +1426,7 @@ MM_WIP.woland_Predict = bigMMWIPwodatalist %>%
 
 bigFWIPwodatalist = list()
 
-for (t in 1:100){ #eventually this is 1:1000
+for (t in 1:1000){ #eventually this is 1:1000
   
   #Create WIP.woland_OneFuture_Fresh####
   #Iteration should start here! 
@@ -1968,10 +1516,12 @@ for (t in 1:100){ #eventually this is 1:1000
 
 #lol ok now what
 
+
 F_WIP.woland_Predict = bigFWIPwodatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
-write.csv(F_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/F_WIP.woland_Predict.csv")
+
+write.csv(F_WIP.woland_Predict,"r:/Current Projects/Predicting-SAV/data/Multiversal Futures/F_WIP.woland_Predict.csv")
 
 gc(bigFWIPwodatalist)
 
