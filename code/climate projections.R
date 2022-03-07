@@ -1,7 +1,7 @@
 #Code for Climate Projections of Chesapeake Bay SAV communities#
 library(tidyverse); library(janitor); library(lme4); library(car)
 
-
+#Notes: 
 #most of the dataframes here were built in /code/assemble climate data.R
 #this code is copy-pasted from the successful code/CC_wl projections clean.R, so shouldnt be different from that.
 #Models used originally come from the SEMs in code/community change model building.R Will need to make sure the past data from those models are available too in the code below.

@@ -334,7 +334,11 @@ WIP.woland_D = WIP.woland_2031_2060 %>%
   group_by(Station, Date) %>%
   summarise(across(Depth:TP, ~.x - lead(.x, order_by = Date))) %>%
   drop_na()
-  
+
+str(WIP.woland_D)
+
+
+
 #Put it all together: ####
 
 #Then, create Projection Prepared dataframes####
@@ -357,7 +361,6 @@ CC.wland_ProjPrep = CC.wland_D %>%
   mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
                                     TRUE ~ .x))) %>% 
   ungroup() #this is just all of the possible things to pull 40 years worth of data from. 
-
 
 CC.wland_summerPP = CC.wland_ProjPrep %>% 
   filter(dplyr::between(month.x, 5, 8)) %>%
@@ -598,7 +601,7 @@ WIP.woland_AllFutures = left_join(WIP.woland_summerPP, WIP.woland_springPP) %>%
   rename("Year" = "year.x")
 
 write.csv(WIP.woland_AllFutures, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
-WIP.woland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
+WIP.woland_AllFutures = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
 
 ####Create WIP.woland_OneFuture####
 WIP.woland_OneFuture.no2031 = WIP.woland_AllFutures %>% 
