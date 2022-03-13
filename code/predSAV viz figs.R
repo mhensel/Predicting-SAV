@@ -99,6 +99,30 @@ ZoDensWQsem.No0_NEW
 View(Zo_WIP.woland_Predict %>% group_by(simnum, year) %>% 
   summarize(tot.Zo = sum(dens.weight.mean, na.rm = T)))
 #Zostera all scens####
+#checking out fixed data....but its not fixed
+ruwipwl_new = 
+Ru_WIP.wland_Predict %>% group_by(simnum, STATION) %>% 
+  summarize(tot.Zo = sum(dens.weight.mean, na.rm = T))
+
+ggplot(data = Ru_WIP.wland_Predict) + 
+  stat_smooth(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
+                summarize(tot.Zo = sum(dens.weight.mean, na.rm = T)), 
+              aes(x = year, y = tot.Zo), method = "gam", 
+              size = 2, color = "cyan3", fill = "cyan1") +
+  geom_line(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
+              summarize(tot.Zo = sum(dens.weight.mean, na.rm = T)), 
+            aes(x = year, y = tot.Zo, group = simnum), method = "gam", 
+            size = .1, alpha = .2, color = "cyan3") +
+  stat_smooth(data = RuDensWQsem.No0_NEW %>% group_by(year) %>% 
+                summarize(tot.Zo = sum(dens.weight.mean, na.rm = T)), 
+              aes(x = year, y = tot.Zo), method = "loess", 
+              size = 2, color = "chartreuse2", fill = "chartreuse1") +
+  theme_bw(base_size=26) + 
+  labs(y = expression(paste("Baywide eelgrass area \n (density-weighted HA)")), x = "") +
+  scale_x_continuous(breaks=seq(1980, 2070, 10)) +
+  theme(plot.margin = unit(c(.3, 1, .3, 1.5), "cm"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
+
+
 Zo_allScenarios = 
 ggplot(data = Zo_CC.wland_Predict) + 
   stat_smooth(data = Zo_CC.wland_Predict %>% group_by(simnum, year) %>% 
@@ -139,6 +163,23 @@ stat_smooth(data = ZoDensWQsem.No0_NEW %>% group_by(year) %>%
 Zo_allScenarios
 
 #ENV ZO Zone####
+#Fixed smoothed TN data here.
+ggplot(data = Ru_WIP.wland_Predict %>% filter(!year %in% c(2020, 2021))) + 
+  geom_line(data = Ru_WIP.wland_Predict %>% filter(!year %in% c(2020, 2021)) %>% group_by(simnum, year) %>% 
+              summarize(TN = mean(TN.spme, na.rm = T)), 
+            aes(x = year, y = TN, group = simnum), alpha = .3, color = "darkslateblue") +
+  stat_smooth(data = Ru_WIP.wland_Predict %>% filter(!year %in% c(2020, 2021)) %>% group_by(simnum, year) %>% 
+                summarize(TN = mean(TN.spme, na.rm = T)), 
+              aes(x = year, y = TN), method = "gam", 
+              size = 3, color = "black", fill = "cyan1") +
+  stat_smooth(data = RuDensWQsem.No0_NEW %>% group_by(year) %>% 
+                summarize(TN = mean(TN.spme, na.rm = T)), 
+              aes(x = year, y = TN), method = "loess", 
+              size = 3, color = "brown2", fill = "brown2") +
+  theme_bw(base_size=30) + 
+  labs(y = expression(paste("mean sp TN (", degree ~ C, ")")), x = "") +
+  scale_x_continuous(breaks=seq(1980, 2070, 10)) +
+  theme(plot.margin = unit(c(.25, 1, .25, 1), "cm"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
 #TEMP ZO ZONE####
 Temp.Zo_allScenarios = #2020 data (i.e. 2021 sumy1med data) is too high bc of sampling
   ggplot(data = Zo_CC.wland_Predict %>% filter(!year %in% c(2020, 2021))) + 
@@ -187,10 +228,10 @@ Secc.Zo_allScenarios = #2020 data (i.e. 2021 sumy1med data) is too high bc of sa
                 summarize(Secc = mean(Secc.summe, na.rm = T) + .01), 
               aes(x = year, y = Secc), method = "loess", 
               size = 1.5, color = "cyan3", fill = "cyan1") +
-  stat_smooth(data = Zo_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-                summarize(Secc = mean(Secc.summe, na.rm = T)), 
-              aes(x = year, y = Secc), method = "loess", 
-              size = 1.5, color = "darkslateblue", fill = "darkslateblue") +
+ # stat_smooth(data = Zo_WIP.woland_Predict %>% group_by(simnum, year) %>% 
+ #               summarize(Secc = mean(Secc.summe, na.rm = T)), 
+  #            aes(x = year, y = Secc), method = "loess", 
+  #            size = 1.5, color = "darkslateblue", fill = "darkslateblue") +
   stat_smooth(data = ZoDensWQsem.No0_NEW %>% group_by(year) %>% 
                 summarize(Secc = mean(Secc.summe, na.rm = T)), 
               aes(x = year, y = Secc), method = "loess", 
@@ -211,10 +252,10 @@ Chla.Zo_allScenarios = #2020 data (i.e. 2021 sumy1med data) is too high bc of sa
                 summarize(Chla = mean(Chla.spme, na.rm = T)), 
               aes(x = year, y = Chla), method = "gam", 
               size = 1.5, color = "cyan3", fill = "cyan1") +
-  stat_smooth(data = Zo_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-                summarize(Chla = mean(Chla.spme, na.rm = T) + 0.2), 
-              aes(x = year, y = Chla), method = "gam", 
-              size = 1.5, color = "darkslateblue", fill = "darkslateblue") +
+#  stat_smooth(data = Zo_WIP.woland_Predict %>% group_by(simnum, year) %>% 
+#                summarize(Chla = mean(Chla.spme, na.rm = T) + 0.2), 
+#              aes(x = year, y = Chla), method = "gam", 
+#              size = 1.5, color = "darkslateblue", fill = "darkslateblue") +
   stat_smooth(data = ZoDensWQsem.No0_NEW %>% group_by(year) %>% 
                 summarize(Chla = mean(Chla.spme, na.rm = T)), 
               aes(x = year, y = Chla), method = "loess", 
@@ -255,19 +296,10 @@ Ru_allScenarios =
               summarize(tot.Ru = sum(dens.weight.mean, na.rm = T)), 
             aes(x = year, y = tot.Ru, group = simnum), 
             size = .1, alpha = .4, color = "cyan3") +
-  stat_smooth(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-                summarize(tot.Ru = sum(dens.weight.mean, na.rm = T)), 
-              aes(x = year, y = tot.Ru), method = "gam", 
-              size = 3, color = "darkslateblue", fill = "darkslateblue") +
-  geom_line(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-              summarize(tot.Ru = sum(dens.weight.mean, na.rm = T)), 
-            aes(x = year, y = tot.Ru, group = simnum), 
-            size = .1, alpha = .4, color = "darkslateblue") +
   stat_smooth(data = RuDensWQsem.No0_NEW %>% group_by(year) %>% 
                 summarize(tot.Ru = sum(dens.weight.mean, na.rm = T)), 
               aes(x = year, y = tot.Ru), method = "gam", 
               size = 3, color = "chocolate4", fill = "chocolate4") +
-  geom_text(aes(x = 2030, y = 1400, label = "Nutrient reduction + Land Use Management"), stat = "unique", size = 8, color = "cyan3") +
   geom_text(aes(x = 2030, y = 720, label = "Nutrient Reduction"), stat = "unique", size = 8, color = "darkslateblue") +
   geom_text(aes(x = 2030, y = 220, label = "No Action"), stat = "unique", size = 8, color = "coral") +
   theme_bw(base_size=28) + 
@@ -285,9 +317,6 @@ Sal.Ru_allScenarios =
   geom_line(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
               summarize(Sal = mean(Sal.spme)), 
             aes(x = year, y = Sal, group = simnum), alpha = .3, color = "cyan") + 
-  geom_line(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-              summarize(Sal = mean(Sal.spme)), 
-            aes(x = year, y = Sal, group = simnum), alpha = .3, color = "darkslateblue") + 
   stat_smooth(data = Ru_CC.wland_Predict %>% group_by(simnum, year) %>% 
                 summarize(Sal = mean(Sal.spme)), 
               aes(x = year, y = Sal), method = "gam", 
@@ -296,10 +325,6 @@ Sal.Ru_allScenarios =
                 summarize(Sal = mean(Sal.spme)), 
               aes(x = year, y = Sal), method = "gam", 
               size = 4, color = "cyan", fill = "cyan1") +
-  stat_smooth(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-                summarize(Sal = mean(Sal.spme)), 
-              aes(x = year, y = Sal), method = "gam", 
-              size = 4, color = "darkslateblue", fill = "darkslateblue") +
   stat_smooth(data = RuDensWQsem.No0_NEW %>% filter(!year == 2020) %>% group_by(year) %>% 
                 summarize(Sal = mean(Sal.spme)), 
               aes(x = year, y = Sal), method = "loess", 
@@ -319,9 +344,6 @@ Chla.Ru_allScenarios =
   geom_line(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
               summarize(Chla = mean(Chla.spme)), 
             aes(x = year, y = Chla, group = simnum), alpha = .3, color = "cyan") + 
-  geom_line(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-              summarize(Chla = mean(Chla.spme)), 
-            aes(x = year, y = Chla, group = simnum), alpha = .3, color = "darkslateblue") + 
   stat_smooth(data = Ru_CC.wland_Predict %>% group_by(simnum, year) %>% 
                 summarize(Chla = mean(Chla.spme)), 
               aes(x = year, y = Chla), method = "gam", 
@@ -330,10 +352,6 @@ Chla.Ru_allScenarios =
                 summarize(Chla = mean(Chla.spme)), 
               aes(x = year, y = Chla), method = "gam", 
               size = 4, color = "cyan", fill = "cyan") +
-  stat_smooth(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-                summarize(Chla = mean(Chla.spme)), 
-              aes(x = year, y = Chla), method = "gam", 
-              size = 4, color = "darkslateblue", fill = "darkslateblue") +
   stat_smooth(data = RuDensWQsem.No0_NEW %>% filter(!year == 2020) %>% group_by(year) %>% 
                 summarize(Chla = mean(Chla.spme)), 
               aes(x = year, y = Chla), method = "loess", 
@@ -352,24 +370,17 @@ TN.Ru_allScenarios =
   geom_line(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
               summarize(TN = mean(TN.spme)), 
             aes(x = year, y = TN, group = simnum), alpha = .3, color = "cyan") + 
-  geom_line(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
-              summarize(TN = mean(TN.spme)), 
-            aes(x = year, y = TN, group = simnum), alpha = .3, color = "darkslateblue") + 
   stat_smooth(data = Ru_CC.wland_Predict %>% group_by(simnum, year) %>% 
                 summarize(TN = mean(TN.spme)), 
               aes(x = year, y = TN), method = "gam", 
               size = 4, color = "coral", fill = "coral1") +
-  stat_smooth(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
+  stat_summary(data = Ru_WIP.wland_Predict %>% group_by(simnum, year) %>% 
                 summarize(TN = mean(TN.spme)), 
-              aes(x = year, y = TN), method = "gam", 
+              aes(x = year, y = TN), geom = "line", 
               size = 4, color = "cyan", fill = "cyan") +
-  stat_smooth(data = Ru_WIP.woland_Predict %>% group_by(simnum, year) %>% 
+  stat_summary(data = RuDensWQsem.No0_NEW %>% filter(!year == 2020) %>% group_by(year) %>% 
                 summarize(TN = mean(TN.spme)), 
-              aes(x = year, y = TN), method = "gam", 
-              size = 4, color = "darkslateblue", fill = "darkslateblue") +
-  stat_smooth(data = RuDensWQsem.No0_NEW %>% filter(!year == 2020) %>% group_by(year) %>% 
-                summarize(TN = mean(TN.spme)), 
-              aes(x = year, y = TN), method = "loess", 
+              aes(x = year, y = TN), geom = "line", 
               size = 4, color = "burlywood", fill = "burlywood1") +
   theme_bw(base_size=24) + 
   labs(y = "mean spring TN", x = "") +
@@ -760,6 +771,7 @@ allcommbasin_CC.df = ZCCbasin %>% bind_rows(RCCbasin) %>% bind_rows(MCCbasin) %>
 qplot(x = year, y = Area.total, color = SpCluster, geom = "smooth", method = "gam", data = allcomm_byyear_CC)
 
 #allcomm_past.df All Past data here######
+
 allcomm_past.df = SAVCommunityDens_AllStations %>% rename("year" = "Year") %>% 
   group_by(SpCluster, year) %>%
   summarize(DWM.total = sum(dens.weight.mean, na.rm = T), 
@@ -819,7 +831,7 @@ AllCommsDPCC_CC.wland
   geom_labelsmooth(data = allcomm_CC.df, 
                    aes(x = year, y = DWM.total, color = SpCluster, label = SpCluster),
                    method = "gam", boxlinewidth = 0, size = 5) +
-  geom_text(aes(x = 2040, y = 10000, label = "Climate change + land use change"), 
+  geom_text(aes(x = 2040, y = 13000, label = "No Action"), 
             stat = "unique", size = 8, color = "coral") +
   labs(y = expression(paste("Baywide SAV area \n (density-weighted HA)")), x = "") +
   theme_bw(base_size=30) + 
@@ -912,7 +924,7 @@ FWIP.wlbasin = F_WIP.wland_Predict %>%
 
 
   #ZWIP.wl WIP.wland####
-
+#3/11/22 ADDED #####
 ZWIP.wl = Zo_WIP.wland_Predict %>% 
     add_column(., SpCluster = "Zostera") %>%
     mutate(Area = predict(dwm.to.HA_Zo, newdata = .)) %>%
@@ -961,7 +973,7 @@ FWIP.wl_FLATS = F_WIP.wland_Predict %>% filter(STATION == "CB1.1") %>%
 
 
   #allcomm#### 
-  allcomm_WIP.wl.df = ZWIP.wl %>% full_join(RWIP.wl) %>% full_join(MWIP.wl) %>% full_join(FWIP.wl) %>% filter(!year == "2020") %>% ungroup()
+  allcomm_WIP.wl.df = ZWIP.wl %>% full_join(RWIP.wl) %>% full_join(MWIP.wl) %>% full_join(FWIP.wl) %>% filter(!year %in% c("2020", "2021")) %>% ungroup()
   #group_by(SpCluster, simnum) %>% slice_sample(., n = 42, replace = F) %>%
   #group_by(year, SpCluster) %>% summarize(DWM.total = mean(DWM.total, na.rm = T))
 allcommbasin_WIP.wl.df = ZWIP.wlbasin %>% full_join(RWIP.wlbasin) %>% full_join(MWIP.wlbasin) %>% full_join(FWIP.wlbasin) %>% filter(!year == "2020") %>% ungroup()
@@ -1241,12 +1253,12 @@ CC = allcomm_CC.df %>% add_column(., Scenario = "CC.wland")
 WIP.wl = allcomm_WIP.wl.df %>% add_column(., Scenario = "WIP.wl") 
 WIP.wol = allcomm_WIP.wol.df %>% add_column(., Scenario = "WIP.wol") 
 
-
+#problem is that not each run is matched up here...
 allcomm_byyear_CC = allcomm_CC.df %>% add_column(., Scenario = "CC.wland") %>%
   group_by(Scenario, year, simnum) %>% 
   summarise(across(DWM.total:Area.total, ~ sum(.x, na.rm = TRUE)))
 
-allcomm_byyear_WIPwl = allcomm_WIP.wl.df %>% add_column(., Scenario = "WIP.wl"w) %>%
+allcomm_byyear_WIPwl = allcomm_WIP.wl.df %>% add_column(., Scenario = "WIP.wl") %>%
   group_by(Scenario, year, simnum) %>% 
   summarise(across(DWM.total:Area.total, ~ sum(.x, na.rm = TRUE)))
 
@@ -1259,11 +1271,11 @@ allcomPastFull.DF = allcomm_past.df %>% group_by(year) %>%
 
 
 fullFutureSAV.DF = full_join(allcomm_byyear_CC, allcomm_byyear_WIPwl) %>%
-  full_join(allcomm_byyear_WIPwol) %>% 
+  #full_join(allcomm_byyear_WIPwol) %>% 
   filter(!year == 2021) %>% #i have no fucking clue why this is a problem but whatever
   mutate(Scenario = case_when(Scenario == "CC.wland" ~ "No Act", 
-                              Scenario == "WIP.wl" ~ "Nut Reduce", 
-                              Scenario == "WIP.wol" ~ "Nut Land Man"))
+                              Scenario == "WIP.wl" ~ "Nut Reduce")) 
+                              #Scenario == "WIP.wol" ~ "Nut Land Man"))
   
 fullFutureSAV.DF %>% group_by(Scenario, year) %>% summarize(me.Area = mean(Area.total)) %>%
 summarize(Ame = mean(me.Area), Amax = max(me.Area))
@@ -1304,9 +1316,9 @@ fullBay.Scenario =
   geom_line(data = fullFutureSAV.DF %>% filter(Scenario == "Nut Reduce"),
             aes(x = year, y = Area.total, group = simnum), 
             size = .3, alpha = .2, color = "deeppink") +
-  geom_line(data = fullFutureSAV.DF %>% filter(Scenario == "Nut Land Man"),
-            aes(x = year, y = Area.total, group = simnum),
-            size = .3, alpha = .2, color = "cyan3") +
+ # geom_line(data = fullFutureSAV.DF %>% filter(Scenario == "Nut Land Man"),
+  #          aes(x = year, y = Area.total, group = simnum),
+  #          size = .3, alpha = .2, color = "cyan3") +
   geom_labelsmooth(data = fullFutureSAV.DF, 
                    aes(x = year, y = Area.total, group = Scenario, 
                        color = Scenario, label = Scenario),

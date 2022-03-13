@@ -121,7 +121,10 @@ Zos_CC.wland_OneFuture = CC.wland_OneFuture %>% drop_na() %>%
 #Load in the SAV change per year data, merged with CBP WQ data, with the 69 variables of interest selected:
 
 #SAVCommDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
-SAVCommDensWQ_69 = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
+SAVCommDensWQ_69 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
+
+file <- "https://raw.githubusercontent.com/r-lib/vroom/main/inst/extdata/mtcars.csv"
+vroom(file)
 
 #We deal with 0s by eliminating any years where the 3 previous years were 0s, with this antijoin code
 SAVCommZeros = SAVCommDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1))  %>%
@@ -165,8 +168,8 @@ future_yrs = seq(2020, 2060, by = 1) #should this be 2021
 
 #Scenario Global DF####
 #This is same for all CC.wlands. Replace for each scenario
-CC.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wland_AllFutures.csv")
-
+#CC.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wland_AllFutures.csv")
+CC.wlAllFut
 
 #Community Initial Density DF####
 #check the ENV vars and the replace_na for each community here!
@@ -204,11 +207,11 @@ bigZodatalist = list()
 
 ##MULTIVERSAL LOOP 1: Zos_CC.wland_Predict####
 
-for (t in 1:10){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   ####Create CC.wland_OneFuture####
   #
-  CC.wland_OneFuture.no2021 = CC.wland_AllFutures %>% 
+  CC.wland_OneFuture.no2021 = CC.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -226,8 +229,7 @@ for (t in 1:10){ #eventually this is 1:1000
     ungroup() %>%
     arrange(Station, Year)
   
-  #everythnig above this is the same for all communities
-  Zos_CC.wland_OneFuture = CC.wland_OneFuture %>% 
+  Zos_CC.wland_OneFuture = CC.wland_OneFuture %>% #This selects the one set of future data, so this is simnum1
     rename("STATION" = "Station", "year" = "Year") %>%
     filter(STATION %in% Zostera_initialDPC$STATION) %>% 
     select(STATION, year, 
@@ -244,7 +246,7 @@ for (t in 1:10){ #eventually this is 1:1000
   Zodatalist = list()
   
   for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    
+    #s = 3
     #subset data by site
     siteenvdata <- Zos_CC.wland_OneFuture[Zos_CC.wland_OneFuture$STATION == zos_station[s],] 
     # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
@@ -293,44 +295,15 @@ for (t in 1:10){ #eventually this is 1:1000
   
 }
 
-#lol ok now what
-library(wesanderson)
+#HUGE Zo_CC.wland_Predict ALERT####
 
 Zo_CC.wland_Predict = bigZodatalist %>% 
   map_dfr(as_tibble, .name_repair = "universal")
-#HUGE DATA ALERT####
+
+vroom_write(Zo_CC.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/Zo_CC.wland_Predict.csv")
+
 #biglist, not needed anymore.
 gc(bigZodatalist)
-
-Zo_CC.wland_Predict %>% 
-  filter(!(between(dens.percomp.change, -.1, .1))) #15621/378840
-
-
-#What things do we want to know abou tthese simulations
-#number of crashes. recovery tiem after crashes. extremes on recovery
-
-
-
-ggplot(data = bd) + 
-  stat_summary(aes(x = year, y = dens.percomp.change), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.percomp.change, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.percomp.change), method = "lm", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Density Change") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
-ggplot(data = bd) + 
-  stat_summary(aes(x = year, y = dens.weight.mean), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.weight.mean, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.weight.mean), method = "lm", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Zostera Change HA") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
 
 
 ##MULTIVERSAL LOOP 2: Ru_CC.wland_Predict####
@@ -369,17 +342,16 @@ RuInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(Chla.spme) +
 df_total = data.frame()
 
 
-#####
 
 bigRudatalist = list()
 
-for (t in 1:10){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   ####Create CC.wland_OneFuture####
   
   #Iteration should start here! 
   #Ruppia doesnt have any y1 so dont need to do these muttates
-  CC.wland_OneFuture.no2021 = CC.wland_AllFutures %>% 
+  CC.wland_OneFuture.no2021 = CC.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) #%>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
   #group_by(Station) %>%
@@ -467,43 +439,15 @@ for (t in 1:10){ #eventually this is 1:1000
 }
 
 #lol ok now what
-library(wesanderson)
-
+#HUGE Ru_CC.wland_Predict alert#####
 
 Ru_CC.wland_Predict = bigRudatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
-#HUGE DATA ALERT####
+
+vroom_write(Ru_CC.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/RuCC.wland_Predict.csv")
+
 #biglist, not needed anymore.
-
-
-
-
-length(unique(Ru420$simnum))
-Ru_CC.wland_Predict %>% 
-  filter(!(between(dens.percomp.change, -.1, .1)))
-#59393 / 1804000 #97% of the ruppia change is between
-
-
-#Visualize
-ggplot(data = Ru_CC.wland_Predict %>% filter(!(between(dens.percomp.change, -.1, .1)))) + 
-  stat_summary(aes(x = year, y = dens.percomp.change), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.percomp.change, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.percomp.change), method = "loess", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Density Change") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
-ggplot(data = Ru_CC.wland_Predict) + 
-  stat_summary(aes(x = year, y = dens.weight.mean), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.weight.mean, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.weight.mean), method = "lm", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Ruppia Change HA") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
+gc(bigRudatalist)
 
 
 ##MULTIVERSAL LOOP 3: MM_CC.wland_Predict####
@@ -537,15 +481,15 @@ MMInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(TN.summe) + log
 
 df_total = data.frame()
 
-
+#####
 bigMMdatalist = list()
 
-for (t in 1:10){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
-  #Create CC.wland_OneFuture_MIXMESO####
+  #Create CC.wland_OneFuture_MIXMESO
   #Iteration should start here! 
   #MixMeso has sumy1max y1 so dont need to do these muttates
-  CC.wland_OneFuture.no2021 = CC.wland_AllFutures %>% 
+  CC.wland_OneFuture.no2021 = CC.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -627,44 +571,11 @@ for (t in 1:10){ #eventually this is 1:1000
   
 }
 
-#lol ok now what
-library(wesanderson)
-
-
+#Big MM_CC.wland_Predict alert#####
 MM_CC.wland_Predict = bigMMdatalist %>% 
   map_dfr(as_tibble, .name_repair = "universal")
 
-#Big Data alert#####
-#list not needed
-
-
-length(unique(MM420$simnum))
-MM_CC.wland_Predict %>% 
-  filter(!(between(dens.percomp.change, -.1, .1)))
-#59393 / 1804000 #97% of the MixMeso change is between
-
-
-#Visualize
-ggplot(data = MM_CC.wland_Predict %>% filter(!(between(dens.percomp.change, -.1, .1)))) + 
-  stat_summary(aes(x = year, y = dens.percomp.change), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.percomp.change, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.percomp.change), method = "loess", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Density Change") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
-ggplot(data = MM_CC.wland_Predict) + 
-  stat_summary(aes(x = year, y = dens.weight.mean), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.weight.mean, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.weight.mean), method = "lm", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted MixMeso Change HA") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
+vroom_write(MM_CC.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/MM_CC.wland_Predict.csv")
 
 ##MULTIVERSAL LOOP 4: F_CC.wland_Predict####
 
@@ -697,16 +608,16 @@ FreshDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
 FInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 +log10(Sal.summe) + log10(Chla.summe) + log10(TP.summe)  + log10(Temp.sumy1me) +log10(Temp.summe)  + log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1 + (1|STATION), data = FreshDensWQsem.No0_NEW)
 
 
-
+#####
 
 bigFdatalist = list()
 
-for (t in 1:10){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   #Create CC.wland_OneFuture_Fresh####
   #Iteration should start here! 
   #Fresh has sumy1max y1 
-  CC.wland_OneFuture.no2021 = CC.wland_AllFutures %>% 
+  CC.wland_OneFuture.no2021 = CC.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -790,40 +701,15 @@ for (t in 1:10){ #eventually this is 1:1000
 }
 
 #lol ok now wha
-
+#Big F_CC.wland_Predict alert#####
 F_CC.wland_Predict = bigFdatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
-#select a random 420 samples 
-#Big Data alert#####
-#list not needed
+vroom_write(F_CC.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/F_CC.wland_Predict.csv")
+
+gc(bigFdatalist)
 
 
-F_CC.wland_Predict %>% 
-  filter(!(between(dens.percomp.change, -.1, .1)))
-#59393 / 1804000 #97% of the Fresh change is between
-
-
-#Visualize
-ggplot(data = F_CC.wland_Predict %>% filter(!(between(dens.percomp.change, -.1, .1)))) + 
-  stat_summary(aes(x = year, y = dens.percomp.change), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.percomp.change, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.percomp.change), method = "loess", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Density Change") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-
-ggplot(data = F_CC.wland_Predict) + 
-  stat_summary(aes(x = year, y = dens.weight.mean), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .2) +
-  stat_summary(aes(x = year, y = dens.weight.mean, group = simnum), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .3,) +
-  geom_smooth(aes(x = year, y = dens.weight.mean), method = "lm", size = 1.2, color = "green") +
-  theme_bw(base_size=12) + 
-  ylab("Predicted Fresh Change HA") + xlab("") +
-  #scale_fill_manual(values = wes_palette("Royal1")) +
-  #scale_x_continuous(breaks=c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
 
 
 ###
@@ -837,11 +723,12 @@ ggplot(data = F_CC.wland_Predict) +
 
 #Scenario Global DF####
 #This is same for all WIP.wlands. Replace for each scenario
-WIP.wland_AllFutures = left_join(WIP.wland_summerPP, WIP.wland_springPP) %>% 
-  select(-year.y) %>% 
-  rename("Year" = "year.x") %>% drop_na() 
 
-WIP.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wland_AllFutures.csv")
+#WIP.wland_AllFutures = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wland_AllFutures.csv")
+
+WIP.wlAllFut
+
+#all_equal(WIP.wland_AllFutures, WIP.wlAllFut)
 
 #Community Initial Density DF####
 #This is all going to be the same as other Scenarios
@@ -852,11 +739,11 @@ bigZoWIPdatalist = list()
 
 ##MULTIVERSAL LOOP 1: Zos_WIP.wland_Predict####
 
-for (t in 1:10){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   ####Create WIP.wland_OneFuture####
   #
-  WIP.wland_OneFuture.no2021 = WIP.wland_AllFutures %>% 
+  WIP.wland_OneFuture.no2021 = WIP.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -894,7 +781,7 @@ for (t in 1:10){ #eventually this is 1:1000
   ZoWIPdatalist = list()
   
   for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    
+
     #subset data by site
     siteenvdata <- Zos_WIP.wland_OneFuture[Zos_WIP.wland_OneFuture$STATION == zos_station[s],] 
     # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
@@ -904,7 +791,7 @@ for (t in 1:10){ #eventually this is 1:1000
     
     
     for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-      # y = 2
+
       dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
       thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
       
@@ -945,25 +832,21 @@ for (t in 1:10){ #eventually this is 1:1000
 }
 
 #lol ok now what
-library(wesanderson)
 
 Zo_WIP.wland_Predict = bigZoWIPdatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
+  map_dfr(as_tibble, .name_repair = "universal")
 
+vroom_write(Zo_WIP.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/Zo_WIP.wland_Predict.csv")
 
 ##MULTIVERSAL LOOP 2: Ru_WIP.wland_Predict####
 
-#####
 
 bigRuWIPdatalist = list()
 
-for (t in 1:10){ #eventually this is 1:1000
-  
-  ####Create WIP.wland_OneFuture####
-  
-  #Iteration should start here! 
+for (t in 1:100){ #eventually this is 1:1000
+
   #Ruppia doesnt have any y1 so dont need to do these muttates
-  WIP.wland_OneFuture.no2021 = WIP.wland_AllFutures %>% 
+  WIP.wland_OneFuture.no2021 = WIP.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) #%>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
   #group_by(Station) %>%
@@ -1051,13 +934,11 @@ for (t in 1:10){ #eventually this is 1:1000
   
 }
 
-#lol ok now what
-library(wesanderson)
-
 
 Ru_WIP.wland_Predict = bigRuWIPdatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
 
+vroom_write(Ru_WIP.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/Ru_WIP.wland_Predict.csv")
 
 ##MULTIVERSAL LOOP 3: MM_WIP.wland_Predict####
 ####DFs needed for loop but not in loop#
@@ -1066,12 +947,12 @@ Ru_WIP.wland_Predict = bigRuWIPdatalist %>%
 #works for all
 bigMMWIPdatalist = list()
 
-for (t in 1:420){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   #Create WIP.wland_OneFuture_MIXMESO####
   #Iteration should start here! 
   #MixMeso has sumy1max y1 so dont need to do these muttates
-  WIP.wland_OneFuture.no2021 = WIP.wland_AllFutures %>% 
+  WIP.wland_OneFuture.no2021 = WIP.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -1154,12 +1035,12 @@ for (t in 1:420){ #eventually this is 1:1000
   
 }
 
-#lol ok now what
+###BIG DATA ALERT####
 
 MM_WIP.wland_Predict = bigMMWIPdatalist %>% 
   map_dfr(as.tibble, .name_repair = "universal")
-###BIG DATA ALERT####
 
+vroom_write(MM_WIP.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/MM_WIP.wland_Predict.csv")
 
 
 ##MULTIVERSAL LOOP 4: F_WIP.wland_Predict####
@@ -1169,12 +1050,12 @@ df_total = data.frame()
 
 bigFdatalist = list()
 
-for (t in 1:2){ #eventually this is 1:1000
+for (t in 1:100){ #eventually this is 1:1000
   
   #Create WIP.wland_OneFuture_Fresh####
   #Iteration should start here! 
   #Fresh has sumy1max y1 so dont need to do these muttates
-  WIP.wland_OneFuture.no2021 = WIP.wland_AllFutures %>% 
+  WIP.wland_OneFuture.no2021 = WIP.wlAllFut %>% 
     group_by(Station, Year) %>% 
     slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
     group_by(Station) %>%
@@ -1265,7 +1146,7 @@ F_WIP.wland_Predict = bigFdatalist %>%
   map_dfr(as.tibble, .name_repair = "universal")
 
 #select a random 420 samples 
-write.csv(F_WIP.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/F_WIP.wland_Predict.csv")
+vroom_write(F_WIP.wland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures SMOO/F_WIP.wland_Predict.csv")
 
 gc(bigFdatalist)
 
@@ -1273,7 +1154,10 @@ gc(bigFdatalist)
 
 ###
 ####
-#####
+
+
+
+#####CAN STOP HERE. DELETING WIP_woland bc land use change does nothing!####
 ######SCENARIO 3 WIP_woland####
 #####
 ####
