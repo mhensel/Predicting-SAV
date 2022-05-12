@@ -21,7 +21,7 @@ load("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/tn_t
 #data2. This has fewer columns than the other because I pulled this from already processed data sets. Duplicates are averaged also.There are some cases of values reported at <DL or a range due to the components being <DL. Those will be reported here in the middle of the range (or ½ DL). Also, you’ll see the RAW_VALUE and FINAL_VALUE columns. FINAL_VALUE has the adjustments I mentioned in my email below – some data values cut-out, some adjusted due to method changes. All units of these parameters are mg/L. I recommend you use FINAL_VALUE column
 
 #also load lat/longs
-LatLongCBPWQ <- read_csv("~/Documents/R projects/Predicting-SAV/data/TidalLongTermStations.csv")
+#LatLongCBPWQ <- read_csv("~/Documents/R projects/Predicting-SAV/data/TidalLongTermStations.csv")
 
 ###format the dates so we can get month, day, year seperate (day prob isnt important but whatever)
 #tbh joining LatLong now seems not worth it, bc have to take it out for summarize() later
@@ -52,11 +52,11 @@ CBPtn = CBPstationNPSS %>%
   filter(PARAMETER == "tn") %>%
   pivot_wider(names_from = "PARAMETER", values_from = "FINAL_VALUE") %>%
   rename(TN = tn) %>% group_by(STATION, date, year, month) %>% 
-  summarize(TN = mean(TN, na.rm = T))%>% ungroup() #some stations have 2 numbers, so take means (might only be CB7.4N)
+  summarize(TN = mean(TN, na.rm = T))%>% ungroup() #some stations have 2 depth numbers, so take means (might only be CB7.4N)
 
 #TN Notes: some stations were corrected, but FINAL_VALUE fixed it. 
-colSums(is.na(CBPtn)) #NA: 8336 NA mostly in the 80s and early 90s
-qplot(x = date, y = TN, data = CBPtn) #Outliers: 22 values over 6.
+#colSums(is.na(CBPtn)) #NA: 8336 NA mostly in the 80s and early 90s
+#qplot(x = date, y = TN, data = CBPtn) #Outliers: 22 values over 6.
 #CBPtn[!is.na(CBPtn$TN) & CBPtn$TN > 6, "TN"] <- 6
 
 #TP####
@@ -68,8 +68,8 @@ CBPtp <- CBPstationNPSS %>%
   summarize(TP = mean(TP, na.rm = T))%>% ungroup() #some dates have 2 numbers, so take means
 
 #TP Notes:
-colSums(is.na(CBPtp)) #NA: 932
-qplot(x = date, y = TP, data = CBPtp) #Outliers: 8 points out of 70804 are above 1.
+#colSums(is.na(CBPtp)) #NA: 932
+#qplot(x = date, y = TP, data = CBPtp) #Outliers: 8 points out of 70804 are above 1.
 CBPtp[!is.na(CBPtp$TP) & CBPtp$TP > 0.6, "TP"] <- 0.6
 
 #TSS####
@@ -91,12 +91,12 @@ CBPtssr = CBPstationNPSS %>%
 #TSS Notes: 
 #RAW_VALUE is same as FINAL_VALUE, F_V just starts after 1999. The following stations are safe to use R_V from: CB4.1E CB5.1 CB5.2CB5.3LE2.3EE1.1EE2.1EE2.2EE3.0EE3.1EE3.2EE3.3ET4.2ET5.2ET8.1ET9.1LE2.2RET2.4LE3.2LE3.3 LE3.4 CB7.3E 
 
-colsums(is.na(CBPtss)) #NA: 30828, all before 99
-qplot(x = date, y = TSS, data = CBPtss) #Outliers: ~20 negative values, and some gigantic ones too
+#colsums(is.na(CBPtss)) #NA: 30828, all before 99
+#qplot(x = date, y = TSS, data = CBPtss) #Outliers: ~20 negative values, and some gigantic ones too
 CBPtss[!is.na(CBPtss$TSS) & CBPtss$TSS < 0, "TSS"] <- 0 #correct negative outliers
 
-colsums(is.na(CBPtssr)) #NA: 0 outliers
-qplot(x = date, y = TSS, data = CBPtssr) #Outliers: ~20 negative values, and 5 values over 500
+#colsums(is.na(CBPtssr)) #NA: 0 outliers
+#qplot(x = date, y = TSS, data = CBPtssr) #Outliers: ~20 negative values, and 5 values over 500
 CBPtssr[!is.na(CBPtssr$TSS) & CBPtssr$TSS < 0, "TSS"] <- 0 #correct negative outliers
 CBPtssr[!is.na(CBPtssr$TSS) & CBPtssr$TSS > 400, "TSS"] <- 400 #correct big outliers
 
@@ -110,9 +110,8 @@ CBPtemp <- CBPstationWTSSC %>%
 
 #Temp Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just means taken
-colsums(is.na(CBPtemp)) #NA: 0
-qplot(x = date, y = Temp, data = CBPtemp) #Outliers: None but 1984 and 1985 have some stations (eg WT2.1) where only winter months are measured, making any mean calculations really small
-#CBPtp[!is.na(CBPtp$TP) & CBPtp$TP > 0.6, "TP"] <- 0.6
+#colsums(is.na(CBPtemp)) #NA: 0
+#qplot(x = date, y = Temp, data = CBPtemp) #Outliers: None but 1984 and 1985 have some stations (eg WT2.1) where only winter months are measured, making any mean calculations really small
 
 #Salinity####
 CBPsal <- CBPstationWTSSC %>%
@@ -124,8 +123,8 @@ CBPsal <- CBPstationWTSSC %>%
 
 #Salinity Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
-colSums(is.na(CBPsal)) #NA: 0
-qplot(x = date, y = Sal, data = CBPsal) #Outliers: None
+#colSums(is.na(CBPsal)) #NA: 0
+#qplot(x = date, y = Sal, data = CBPsal) #Outliers: None
 #CBPtp[!is.na(CBPtp$TP) & CBPtp$TP > 0.6, "TP"] <- 0.6
 
 #Secchi####
@@ -138,8 +137,8 @@ CBPsecc <- CBPstationWTSSC %>%
 
 #SSecchi Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
-colSums(is.na(CBPsecc)) #NA: 0
-qplot(x = date, y = Secc, data = CBPsecc) #Outliers: 8 points above 6 secchi, one above 10
+#colSums(is.na(CBPsecc)) #NA: 0
+#qplot(x = date, y = Secc, data = CBPsecc) #Outliers: 8 points above 6 secchi, one above 10
 CBPsecc[!is.na(CBPsecc$Secc) & CBPsecc$Secc > 6, "Secc"] <- 6
 
 #ChlA####
@@ -152,8 +151,8 @@ CBPchla <- CBPstationWTSSC %>%
 
 #Chla Notes:
 #DEPTH column has a handfull of 3s and 2s, then all 0,1,.5 but its not like there were multiples taken from diff depths so just ignore I think
-colsums(is.na(CBPchla)) #NA: 0
-qplot(x = date, y = Chla, data = CBPchla) #Outliers: 1 points above 300 chla, two above 600
+#colsums(is.na(CBPchla)) #NA: 0
+#qplot(x = date, y = Chla, data = CBPchla) #Outliers: 1 points above 300 chla, two above 600
 CBPchla[CBPchla$Chla > 450, "Chla"] <- 450 
 
 #Master all CBP WQ dataframe####
@@ -185,7 +184,8 @@ ggplot(data = CBPall %>% filter(STATION == "CB5.1")) +
 
 
 ####summarizing Env Variables of interest MH######
-CBPall= read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv")
+CBPall= vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv") %>%
+  as_tibble()
 
 #Springtime mean WQ DF CBP.WQ_spme ####
 #(145 stations * 37 years = 5365 possible obs)
@@ -463,8 +463,21 @@ is.na(CBP.WQ_combined) <- CBP.WQ_combined == "NaN"
 is.na(CBP.WQ_combined) <- CBP.WQ_combined == "Inf"
 is.na(CBP.WQ_combined) <- CBP.WQ_combined == "-Inf"
 
-write_csv(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_combined.csv")
-write_csv(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+vroom_write(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_combined.csv")
+vroom_write(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
+
+#CBP.WQ_forPredictions######
+#Specifically select only the ones we need for the projections
+CBP.WQ_forPredictions = CBP.WQ_combined %>% 
+  select(Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, 
+         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summed, Temp.summax, 
+         Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Sal.summed, 
+         Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, 
+         TP.summe, TP.summax, TN.spme, TN.spmed, TN.summe)
+
+vroom_write(CBP.WQ_forPredictions, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
+vroom_write(CBP.WQ_forPredictions, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_forPredictions.csv")
+  
 
 #69 Variables Changed seasons####
 #NOTE: Growing season is to august, and spring is till june in this!!!1
