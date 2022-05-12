@@ -245,6 +245,69 @@ WIPwocb1.1TN = WIP.woland_2031_2060 %>% filter(Station == "CB1.1") #%>% select(D
 #4/20/22 update: We may need to ditch the DM matchup because we have a new problem where neighboring stations are having data selected from different years. this creates a big averaging problem doesnt it??
 #5/4/22 Update: Needed to fix all of the NAs in the CBPall dataset. We also change to pull past data only from 2000-2020. And there is a new nest_by() in the climate projections code so we make sure that neighboring stations arent pulling from different past years! 
 
+####Build NA-less SAVCommDens and twentyone w####
+#Load in the SAV change per year data, merged with CBP WQ data, with the 69 variables of interest selected:
+
+
+SAVCommDensWQ_fP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_forPredictions.csv")
+
+SAVCommDensWQ_fP_MEDIANS = SAVCommDensWQ_fP %>% 
+  filter(between(year, 1999, 2020)) %>% 
+  group_by(STATION) %>%
+  summarize(across(Temp.sumy1med:TN.summe, ~median(., na.rm = T), .names = "{.col}_med"))
+
+#We deal with 0s by eliminating any years where the 3 previous years were 0s, with this antijoin code
+SAVCommZeros = SAVCommDensWQ_fP %>%
+  mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1))  %>%
+  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
+#anti join the 0s to get a No0 df
+
+SAVCommDensWQ_ForPred = anti_join(SAVCommDensWQ_fP, SAVCommZeros) %>% #anti the 0s
+  full_join(SAVCommDensWQ_fP_MEDIANS) %>% #fill in NAs with medians
+  group_by(STATION) %>%
+  mutate(Temp.sumy1med = coalesce(Temp.sumy1med, Temp.sumy1med_med), 
+         Temp.sumy1me = coalesce(Temp.sumy1me, Temp.sumy1me_med),
+         Temp.summe = coalesce(Temp.summe, Temp.summe_med),
+         Temp.summed = coalesce(Temp.summed, Temp.summed_med),
+         Temp.summin = coalesce(Temp.summin, Temp.summin_med),
+         Temp.spme = coalesce(Temp.spme, Temp.spme_med),
+         Temp.spmed = coalesce(Temp.spmed, Temp.spmed_med),
+         Sal.summe = coalesce(Sal.summe, Sal.summe_med),
+         Sal.summax = coalesce(Sal.summax, Sal.summax_med),
+         Sal.summed = coalesce(Sal.summed, Sal.summed_med),
+         Sal.spme = coalesce(Sal.spme, Sal.spme_med),
+         Sal.sumy1max = coalesce(Sal.sumy1max, Sal.sumy1max_med),
+         Secc.summe = coalesce(Secc.summe, Secc.summe_med),
+         Chla.spme = coalesce(Chla.spme, Chla.spme_med),
+         Chla.summe = coalesce(Chla.summe, Chla.summe_med),
+         TN.spme = coalesce(TN.spme, TN.spme_med),
+         TN.summe = coalesce(TN.summe, TN.summe_med),
+         TP.spme = coalesce(TP.spme, TP.spme_med),
+         TP.summe = coalesce(TP.summe, TP.summe_med)) %>%
+  select(STATION, year, SpCluster, 
+         dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, 
+         dens.percomp.change, denscomp.max, SAVArea, 
+         Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, Temp.spmed, Temp.spme, 
+         Temp.summin, Temp.summe, Temp.summed, Temp.summax, Chla.spme, Chla.summe, 
+         Sal.summed, Sal.spme, Sal.summe,  Secc.summe, TP.spme, TP.summe, TN.spme, TN.summe) 
+
+vroom_write(SAVCommDensWQ_ForPred, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_semForPredictions.csv")
+
+CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
+
+twentyone = CBP.WQ_forPredictions %>%  #twentyone should work for all Communities
+  filter(year %in% c("2020", "2019", "2018", "2017")) %>%
+  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
+  group_by(STATION) %>%
+  summarize(across(Temp.summed:Sal.summax, ~mean(., na.rm = T))) %>%
+  mutate(year = 2021) %>% #change year, bc y being changed to y1
+  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
+  rename(Station = STATION, Year = year) %>%
+  select(Station, Year, everything()) %>% 
+  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #LE5.5 doenst have temp, TFs and RET5.1A dont have salinities
+  ungroup() 
+
+
 #"no climate change" scenario ####
 #This is assuming that 2021-2060 will just basically be randomly drawn from the past data that we have from CBP 1984-2020. future projections from real CBP Data, randomly drawn as NO CC#
 #NOTE: 1984-1987 have NAs that could cause problems. Also, spring 2020 data is incomplete because of covid
@@ -694,7 +757,7 @@ CBPallclean_sum = CBPall_0020 %>%
 
 ####Summarize Spring 
 CBPallclean_sp = CBPall_0020 %>% 
-  filter(dplyr::between(month, 3, 9)) %>% #late june isnt spring.... #FYI i found this to be 3, 9 for the model data
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... #FYI i found this to be 3, 9 for the model data
   group_by(Station, year) %>% 
   summarise(Chla.spme = mean(Chla, na.rm = T), 
             Secc.spme = mean(Secc, na.rm = T), 
