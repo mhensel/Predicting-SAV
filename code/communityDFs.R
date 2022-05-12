@@ -29,8 +29,6 @@ dwm.to.HA_F = lm(SAVArea ~ dens.weight.mean, data = SAVCommunityDens_AllStations
 SAVCommunityDens_AllStations %>% group_by(Station, Year) %>% filter(SpCluster == "Zostera") %>%
   mutate(pred.Area = predict(dwm.to.HA_Zo, newdata = .))
 
-predict(dwm.to.HA_Zo, newdata = )
-
 AllStationsByCommunity <- Overlap_AllStations %>% 
   group_by(SpCluster) %>%
   pivot_wider(names_from = Density, values_from = SAV_HA, names_prefix = "SAVdens") %>%
@@ -67,12 +65,24 @@ SAVCommunityDens_AllStations <- AllCommunitiesDensityTime %>%
 write_csv(SAVCommunityDens_AllStations, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommunityDens_AllStations.csv")
 write_csv(SAVCommunityDens_AllStations, "~/Documents/R projects/Predicting-SAV/data/SAVCommunityDens_AllStations.csv")
 
-CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
-CBP.WQ_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+#CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
+#CBP.WQ_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
 
-SAVCommDensWQ_69 <- SAVCommunityDens_AllStations %>%
+#SAVCommDensWQ_69 <- SAVCommunityDens_AllStations %>%
+#  rename(year = Year, STATION = Station) %>%
+ # left_join(CBP.WQ_69vars)
+
+CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
+
+SAVCommDensWQ_forPredictions <- SAVCommunityDens_AllStations %>%
   rename(year = Year, STATION = Station) %>%
-  left_join(CBP.WQ_69vars)
+ left_join(CBP.WQ_forPredictions)
+
+vroom_write(SAVCommDensWQ_forPredictions, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_forPredictions.csv")
+vroom_write(SAVCommDensWQ_forPredictions, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_forPredictions.csv")
+
+
+
 
 #nacheck
 #View(SAVCommDensWQ_69 %>% group_by(year) %>% 
@@ -82,6 +92,20 @@ SAVCommDensWQ_69 <- SAVCommunityDens_AllStations %>%
 #New MASTER Bay SAV Density and WQ Dataset!!!#####
 #write_csv(SAVCommDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
 #write_csv(SAVCommDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #THIS IS NOT NEEDED ANYMORE#########
 #

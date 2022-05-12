@@ -774,10 +774,11 @@ ZoDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
 qplot(x = dens.percomp.y1, y = dens.percomp.change, data = ZoDensWQsem.No0_NEW) + geom_smooth()
 
 #Zostera Change SEM locked####
-#Fisher's C = 8.366 with P-value = 0.399 and on 8 degrees of freedom
+#Fisher's C = 4.63 with P-value = 0.796 and on 8 degrees of freedom
 #Response method Marginal Conditional
-#Chla.spme   none     0.45        0.60
-#dens.percomp.change   none     0.32        0.44
+#Chla.spme   none     0.44        0.59
+#dens.percomp.change   none     0.34        0.43
+#do these look off? well we ran it with the correct spring data and not the DF above (for projections)
 
 #NOTES: unlock/relock 10/7 to simplify and improve Chla R2. y1 insignif if Tmep.spme*dpc included, for some weird reason.
 #I DONT SUGGEST UNLOCKING THIS ONE AGAIN

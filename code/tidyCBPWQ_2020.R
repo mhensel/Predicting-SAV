@@ -451,11 +451,11 @@ CBP.WQ_grow <- CBPall %>%
          Sal.growy1med = lag(Sal.growmed), Chla.growy1med = lag(Sal.growmed), 
          Secc.growy1med = lag(Secc.growmed)) %>% ungroup()
 
-#Joining dfs togehter####
+#CBP.WQ_combined####
 #Depends on how you want to do this but we have CBP.WQ_summer, CBP.WQ_spring, and CBP.WQ_yearly
 #
 CBP.WQ_combined = full_join(CBP.WQ_yearly, CBP.WQ_spring) %>% full_join(CBP.WQ_summer) %>%
-  full_join(CBP.WQ_grow)
+  full_join(CBP.WQ_grow) #note that this is the correct spring!
   #mutate(STATION = replace(STATION, STATION == "LE5.5", "LE5.5-W"))
 
 #I recommend using this code to standardize NAs
@@ -469,7 +469,7 @@ vroom_write(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_
 #CBP.WQ_forPredictions######
 #Specifically select only the ones we need for the projections
 CBP.WQ_forPredictions = CBP.WQ_combined %>% 
-  select(Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, 
+  select(year, STATION, Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, 
          Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summed, Temp.summax, 
          Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Sal.summed, 
          Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, 
@@ -569,7 +569,7 @@ CBP.WQ_69grow <- CBPall %>%
 
 ####69spring, yspring####
 CBP.WQ_69sp <- CBPall %>% 
-  filter(between(month, 3, 6)) %>%
+  filter(between(month, 3, 6)) %>% #ALERT######
   group_by(year, STATION) %>% 
   summarise(Chla.spmax = max(Chla, na.rm = T), Chla.spmin = min(Chla, na.rm = T), 
             Chla.spme = mean(Chla, na.rm = T), 
