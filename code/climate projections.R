@@ -295,6 +295,7 @@ Ruppia.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/dat
 MixMeso.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/MixMeso.OneBay_CC.csv")
 Fresh.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_CC.csv")
 #IntoTheOneTrueMultiverse 1: Zostera OneTrueBay CC####
+#ADAPTIVE MODELLING APPLIED TO THIS LOOP!#####
 bigZodatalist = list()
 
 for (t in 1:5){ 
