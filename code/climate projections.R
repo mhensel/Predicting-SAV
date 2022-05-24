@@ -1,9 +1,18 @@
 #Code for Climate Projections of Chesapeake Bay SAV communities#
 library(tidyverse); library(janitor); library(lme4); library(car); library(vroom); library(performance)
 
-#5/12/22: Can skip down to 103 and load those DFs. Start loading data with line 11 to build all the previous data
+#NOTES: ####
+#As of 5/12/22: Start loading data with line 20 to build all the "past" dataframes and models we need for projections. Actual projecting is done with those DFs and the .OneBays 
+#List of DFs needed to run projections: 
+#Past:
+#SAVCommDensWQ_ForPred = past (1984-2020) water quality and SAV data (actually only use 2020 from this DF and might adjust the need for this DF later, but whatever)
+#SAVWQallClean = "modern" past (2000-2020) water quality and SAV data. Use this for the initial LMER model to begin predictions
 
-#Notes: 
+#Future: 
+#CommunityName.OneBay_CC or CommunityName.OneBay_WIP  (i.e., "Zostera.OneBay_WIP)
+#Future (2020-2060) Zostera, Ruppia, MixMeso, Fresh environmental variable DF for each of the 2 scenarios, by simulation number Station and Year. this DF should have just the environmental variables needed for the LMER of each community, a col for dens.percomp (2020 density, % of composite max area), and denscomp.max (maximum density per composite area)
+
+#Other Notes: ####
 #most of the dataframes here were built in /code/assemble climate data.R
 #this code was originally copy-pasted from the successful code/CC_wl projections clean.R, but the workflow changed a bit to accomodate the ONEBAY data.
 #Models used originally come from the SEMs in code/community change model building.R Will need to make sure the past data from those models are available too in the code below.
@@ -11,19 +20,24 @@ library(tidyverse); library(janitor); library(lme4); library(car); library(vroom
 ####DFs needed for ALL loops but not in loop####
 ##SAV Density and WQ per Community over past time#
 #SAVCommDensWQ_69sem.No0 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69sem.No0.csv")
+
 SAVCommDensWQ_ForPred = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv") #past water quality and sav data 
+SAVCommDensWQ_ForPred = vroom("data/SAVCommDensWQ_forPredictions.csv") #github paths
+
 
 SAVWQallClean = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean.csv") #2000-2020 water quality and sav data, medians filling in NAs in order to feed properly into the models
+SAVWQallClean = vroom("data/SAVWQallClean.csv") #GitHub path...
 
 #twentyone: we need to generate y1 Temp and Sal for some models but the projected data doesnt have that. So we use 2020 real data
-twentyone = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/twentyone.csv")
+#twentyone = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/twentyone.csv") I dont think we need this anymore bc its baked into the .OneBay
+#vector of all the future years, need this in the projection loop####
 future_yrs = seq(2020, 2060, by = 1) #should this be 2021
 
-#Initial Community Dataframes, and ME Models here####
-#check the ENV vars and the replace_na for each community here!
+#Initial Community Dataframes, and ME Models here, Run all this code!!####
+#Build two of the key past DFs, and some important vectors for each communnity
 
 #Zostera Initial and Model####
-Zostera_initialDPC = SAVCommDensWQ_ForPred %>% #why is this diff than allClean. ####
+Zostera_initialDPC = SAVCommDensWQ_ForPred %>% #note to MH: investigate why this diff than allClean
   ungroup() %>%
   filter(SpCluster == "Zostera") %>%
   filter(!STATION %in% c("LE5.5-W")) %>% #seriously fuck this station
@@ -144,13 +158,13 @@ check_singularity(FInt.lmer)
 ####
 
 OB_od = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/FutureMatrix.csv")
-######SCENARIO 1 CC_wland, Skip to line 277 to load data####
+######SCENARIO 1 Climate Change, No Nutrient Reduction Scenario: CC_wland, Skip to line ~302 to load data####
 ####
 ###
 ##
 #
 
-#Scenario Global DF####
+#Scenario Global DF, can skip to .OneBay_CC####
 #This is same for all CC.wlands. Replace for each scenario
 CC.wlAllFut_ONEBAY = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wlAllFutsmoodetre_ONEBAY.csv")
 
@@ -289,50 +303,50 @@ Fresh.OneBay_CC = CC.wland_OneFuture %>%
 
 vroom_write(Fresh.OneBay_CC,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_CC.csv")
 
-#OneTrueBay_CC Simulations#####
+#OneTrueBay_CC Simulations, LOAD ME!#####
 Zostera.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zostera.OneBay_CC.csv")
 Ruppia.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ruppia.OneBay_CC.csv")
 MixMeso.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/MixMeso.OneBay_CC.csv")
 Fresh.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_CC.csv")
+
+#github path = data/Zostera.OneBay_CC.csv
 #IntoTheOneTrueMultiverse 1: Zostera OneTrueBay CC####
 #ADAPTIVE MODELLING APPLIED TO THIS LOOP!#####
-bigZodatalist = list()
+bigZodatalist = list() #we will populate this list
 
-for (t in 1:5){ 
+#Outermost loop, run every simulation (simnum_OB) one at a time
+for (t in 1:5){ #this will be 1:100 or 1:1000 but 5 is enough for now
  # t = 2
   Zos.OTB_CC = Zostera.OneBay_CC[Zostera.OneBay_CC$simnum_OB == t,] 
   
   Zodatalist = list()
   
-  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+  for(s in 1:length(zos_station)) { #middle loop, run individual stations one at a time, builds "siteenvdata" which is a stations environmental data, into the future, for each simulation
    #  s = 3
     #subset data by site
     siteenvdata <- Zos.OTB_CC[Zos.OTB_CC$STATION == zos_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
+    siteenvdata$dens.percomp.change = NA  #build a dens.percomp.change column, this is what is predicted by our LMER
+    siteenvdata$dens.weight.mean = NA #dens.weright.mean gets back calculated
     siteenvdata <- as.data.frame(siteenvdata)
-    datapred.y = ZoDensWQsem.No0_Predict #%>%  #here
-     # select(year, STATION, Chla.spme, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme, denscomp.max, dens.percomp.change, dens.weight.mean) 
+    datapred.y = ZoDensWQsem.No0_Predict  #here is the dataframe that will be updated as part of the adaptive modelling
     
-    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2. If I could get accumulate2() to start on the second row, wouldnt need this bullshit
    #     y = 2
       dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
       thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
-      
 
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+      #predict the year (y) based on thisyearinfo!
+      CurrentYrPredict <- thisyrinfo %>% 
       #  select(-simnum_OB) %>%
-        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        dens.percomp > 1 ~ 1.0001,
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
+        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>% #predict change based on lmer
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>% #calculate density percomposite area from change
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, #No 0s allowed
+                                        dens.percomp > 1 ~ 1.0001, #No densities allowed over 100%, i.e., bigger than we've ever seen before
+                                        TRUE ~ dens.percomp)) %>% #no 
+        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>% #calculate dens.weight.mean
         mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean)) %>%
-        mutate(dens.percomp.y1 = dens.percomp.y1)
+                                            TRUE ~ dens.weight.mean)) %>% #no 0s allowed for dens.weight.mean, although i dont think this matters
+        mutate(dens.percomp.y1 = dens.percomp.y1) #put last year's density into this DF bc we need it for adaptive modelling adjustment
       
       
       #col 11 in CYP = dens.percomp | col 11 in siteenvdata
@@ -342,7 +356,8 @@ for (t in 1:5){
       siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
       siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
       siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.mean
-      
+
+      #ok now also bind that newest year to the datapred.y, and slice off the 20 most recent years!      
   datapred.y = datapred.y %>% #Trying adaptive modelling here####
    bind_rows(CurrentYrPredict) %>% 
     group_by(STATION) %>%
@@ -350,11 +365,7 @@ for (t in 1:5){
     slice_head(n = 20) %>% #select the 20 most recent years
     ungroup()
     
-      
-#Update thisyearinfo here, AND update the input into the mixed model
-#update dens.percomp.y1
-#drop the oldest year from the datapred.y
-  
+  #ADAPTIVE MODEL! update the ZoInt.lmer model to have been fed the newest years
       ZoInt.lmer <- lm(dens.percomp.change ~ dens.percomp.y1  +  log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) +  (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ 
       (dens.percomp.y1:log10(Secc.summe)), data = datapred.y)
       #i switched over to the lm because the random effect is STATION
@@ -368,7 +379,7 @@ for (t in 1:5){
   # rbind together all objects in datalist
   siteenvdataagg <- bind_rows(Zodatalist)
   # add column for simnum and populate with t (outer loop iteration)
-  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1])) #We will need to bring this back
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1])) #will We  need to bring this back?
   # write big dataframe to big data list 
   bigZodatalist[[t]] <- siteenvdataagg
   
@@ -402,6 +413,7 @@ ZCC.otbNonAdapt = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data
 #biglist, not needed anymore.
 gc(bigZodatalist)
 
+#No more Adaptive modelling after this...yet (5/24/22)####
 #IntoTheOneTrueMultiverse 2: Ruppia OneTrueBay CC####
 bigRudatalist = list()
 
@@ -613,7 +625,7 @@ gc(bigFdatalist)
 
 
 
-######SCENARIO 2 WIP_wland, Skip to line 681####
+######SCENARIO 2 WIP_wland, Skip to line 743####
 ####
 ###
 ##
@@ -622,7 +634,6 @@ gc(bigFdatalist)
 #Do OneBay_WIP next####
 WIP.wland_OneFuture = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/WIP.wland_OneFuture.csv")
 #Zostera.OneBay_WIP####
-#Zostera.OneBay_CC####
 Zostera.OneBay_WIP = WIP.wland_OneFuture %>% 
   rename("STATION" = "Station", "year" = "Year") %>%
   filter(STATION %in% Zostera_initialDPC$STATION) %>% 
@@ -746,7 +757,7 @@ bigZodatalist = list()
 
 bigZodatalist = list()
 
-#adaptive test
+#adaptive test. Trying adaptive modelling on the Zos WIP but havent finished yet 5/24/22####
 for (t in 1:5){ 
   # t = 2
   Zos.OTB_WIP = Zostera.OneBay_WIP[Zostera.OneBay_WIP$simnum_OB == t,] 
@@ -1231,7 +1242,13 @@ gc(bigZodatalist)
 #
 #
 
-
+#
+#
+#
+#
+###
+#### 
+####
 #OneBay style code that works but doesnt do the all common simulations thing:
 #ALERT: This code corrects dens.comp over 1, and dwm over 1, too late, so fix that before useage####
 
@@ -2885,936 +2902,3 @@ gc(bigFdatalist)
 
 
 
-#####CAN STOP HERE. DELETING WIP_woland bc land use change does nothing!####
-######SCENARIO 3 WIP_woland####
-#####
-####
-###
-
-######this is the one scenario that does need a little tweaking
-####DFs needed for loop but not in loop####
-##Universal DF: twentyone####
-
-#Scenario Global DF####
-#Add 2021-2030 wland to woland to complete this dataset
-WIP.woland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.woland_AllFutures.csv")
-
-WIP.wland_AllFutures = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wland_AllFutures.csv")
-
-WIP.woland_AllFutures2020start = WIP.wland_AllFutures %>% filter(between(Year, 2021, 2030)) %>%
-  bind_rows(WIP.woland_AllFutures) %>%
-  arrange(Station, Year)
-
-#Community Initial Density DF####
-#check the ENV vars and the replace_na for each community here!
-
-#Need this bigdatalist to be an empty list
-#I renamed this Rudatalist on the Ruppia sim but was too scared to touch this one
-bigZoWIPwodatalist = list()
-
-##MULTIVERSAL LOOP 1: Zos_WIP.woland_Predict####
-
-for (t in 1:2){ #eventually this is 1:1000
-  
-  ####Create WIP.woland_OneFuture####
-  #
-  
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures2020start %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
-           Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
-           Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  #Filter out 
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
-    select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
-    full_join(twentyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2021") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  #everythnig above this is the same for all communities
-  Zos_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Zostera_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.spme, TP.spmed, TN.spme, Secc.summe, 
-           Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>% #select the Zostera WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(Zostera_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-   # mutate(year = case_when(year == 2020 ~ 2030, 
-   #                         TRUE ~ year)) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  #i name this Rudatalist in the other loops but dont wanna mess
-  ZoWIPwodatalist = list()
-  
-  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 3
-    #subset data by site
-    siteenvdata <- Zos_WIP.woland_OneFuture[Zos_WIP.woland_OneFuture$STATION == zos_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-       #y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001,
-                                        dens.percomp > 1 ~ 1.0001,
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      
-      
-      #col 11 in CYP = dens.percomp | col 11 in siteenvdata
-      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
-      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
-      
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
-      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
-      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.mean
-      
-      #add a case_when so no 0s?
-      
-    }
-    
-    ZoWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(ZoWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigZoWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now what
-
-Zo_WIP.woland_Predict = bigZoWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-
-##MULTIVERSAL LOOP 2: Ru_WIP.woland_Predict####
-####DFs needed for loop but not in loop#
-
-#####
-
-bigRuWIPwodatalist = list()
-
-for (t in 1:2){ #eventually this is 1:1000
-  
-  ####Create WIP.woland_OneFuture####
-  
-  #Iteration should start here! 
-  #Ruppia doesnt have any y1 so dont need to do these muttates
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures2020start %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) #%>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-  #group_by(Station) %>%
-  #mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
-  #       Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
-  #       Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
-    #select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
-    full_join(twentyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2021") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  #everythnig above this is the same for all communities
-  Ru_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Ruppia_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.spme, TP.spme, TN.spme, Sal.spme, Temp.spme) %>% #select the Ruppia WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(Ruppia_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  # FIX NA's IN THE PREDICTED CLIMATE MATRIX BEFORE GOING TO NEXT LOOP
-  
-  RuWIPwodatalist = list()
-  
-  for(s in 1:length(ru_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- Ru_WIP.woland_OneFuture[Ru_WIP.woland_OneFuture$STATION == ru_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-      #y = 3
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],8] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 8 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(RuInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        dens.percomp > 1 ~ 1.0001,
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      
-      
-      #col 8 in CYP = dens.percomp | col 8 in siteenvdata
-      #col 10 in CYP = dens.percomp.change | col 10 in siteenvdata 
-      #col 11 in CYP = dens.weight.mean | col 11 in siteenvdata 
-      
-      siteenvdata[y,8] <- CurrentYrPredict[1,8] #dens.percomp
-      siteenvdata[y,10] <- CurrentYrPredict[1,10] #dens.percomp.change
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.weight.mean
-      
-      #add a case_when so no 0s?
-      
-    }
-    
-    RuWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(RuWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigRuWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-
-Ru_WIP.woland_Predict = bigRuWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-#59393 / 1804000 #97% of the ruppia change is between
-
-
-##MULTIVERSAL LOOP 3: MM_WIP.woland_Predict####
-####DFs needed for loop but not in loop#
-
-
-bigMMWIPwodatalist = list()
-
-for (t in 1:2){ #eventually this is 1:1000
-  
-  #Create WIP.woland_OneFuture_MIXMESO####
-  #Iteration should start here! 
-  #MixMeso has sumy1max y1 so dont need to do these muttates
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures2020start %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year)) #, 
-  #       Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
-  #       Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  
-  #Filter out 
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
-    select(-Sal.sumy1max) %>%
-    full_join(twentyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2021") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  MM_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% MixMeso_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.summe, Temp.summe, Temp.summin, TP.summe, TN.summe, Sal.sumy1max) %>% #select the MixMeso WQ Variables
-    #drop_na() %>% #DUDE fuck these NAs
-    full_join(MixMeso_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  # FIX NA's IN THE PREDICTED CLIMATE MATRIX BEFORE GOING TO NEXT LOOP
-  
-  MMWIPwodatalist = list()
-  
-  for(s in 1:length(MM_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- MM_WIP.woland_OneFuture[MM_WIP.woland_OneFuture$STATION == MM_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-      #  y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],9] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(MMInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        dens.percomp > 1 ~ 1.0001,
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
-      #col 11 in CYP = dens.percomp.change | col 11 in siteenvdata 
-      #col 12 in CYP = dens.weight.mean | col 12 in siteenvdata 
-      
-      siteenvdata[y,9] <- CurrentYrPredict[1,9] #dens.percomp 
-      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp.change
-      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.weight.mean
-      
-    }
-    
-    MMWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(MMWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigMMWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now what
-
-
-MM_WIP.woland_Predict = bigMMWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-
-##MULTIVERSAL LOOP 4: F_WIP.woland_Predict####
-####DFs needed for loop but not in loop#
-
-bigFWIPwodatalist = list()
-
-for (t in 1:2){ #eventually this is 1:1000
-  
-  #Create WIP.woland_OneFuture_Fresh####
-  #Iteration should start here! 
-  #Fresh has sumy1max y1 so dont need to do these muttates
-  WIP.woland_OneFuture.no2021 = WIP.woland_AllFutures2020start %>% 
-    group_by(Station, Year) %>% 
-    slice_sample(., n = 1, replace = T) %>% #randomly select a year, will give a timeline of 40 years bc grouped by Year
-    group_by(Station) %>%
-    mutate(Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year))
-  #     Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year)),  
-  #     Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
-  
-  WIP.woland_One2021 = WIP.woland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
-    select(-Temp.sumy1me) %>% #, -Temp.sumy1med, -Sal.sumy1max) %>% ) %>%
-    full_join(twentyone) 
-  
-  WIP.woland_OneFuture = WIP.woland_OneFuture.no2021 %>% 
-    filter(!Year == "2021") %>%
-    bind_rows(WIP.woland_One2021) %>% 
-    ungroup() %>%
-    arrange(Station, Year)
-  
-  F_WIP.woland_OneFuture = WIP.woland_OneFuture %>% 
-    rename("STATION" = "Station", "year" = "Year") %>%
-    filter(STATION %in% Fresh_initialDPC$STATION) %>% 
-    select(STATION, year, 
-           Chla.summe, Temp.summe, Temp.summax, Temp.sumy1me, TP.summe, TN.summe, Sal.summe) %>% #select the Fresh WQ Variables
-    full_join(Fresh_initialDPC) %>% #join in the initial dens. bind rows was what i had before so check the loop columns bc for loops are stupid
-    mutate(Sal.summe = Sal.summe + .001) %>%
-    group_by(STATION, year) %>%
-    arrange(STATION, year) %>% 
-    group_by(STATION) %>%
-    fill(denscomp.max) %>%
-    #mutate(dens.percomp.y1 = lag(dens.percomp, n = 1)) %>% #took this out bc we make our
-    ungroup() 
-  
-  # FIX NA's IN THE PREDICTED CLIMATE MATRIX BEFORE GOING TO NEXT LOOP
-  
-  FWIPwodatalist = list()
-  
-  for(s in 1:length(F_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    #s = 4
-    #subset data by site
-    siteenvdata <- F_WIP.woland_OneFuture[F_WIP.woland_OneFuture$STATION == F_station[s],] 
-    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
-    siteenvdata$dens.percomp.change = NA  
-    siteenvdata$dens.weight.mean = NA
-    siteenvdata <- as.data.frame(siteenvdata)
-    
-    
-    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-      #  y = 2
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],10] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
-      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
-      
-      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
-        mutate(dens.percomp.change = predict(FInt.lmer, newdata = .)) %>%
-        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
-        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
-                                        dens.percomp > 1 ~ 1.0001,
-                                        TRUE ~ dens.percomp)) %>%
-        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
-        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
-      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
-      #col 11 in CYP = dens.percomp.change | col 11 in siteenvdata 
-      #col 12 in CYP = dens.weight.mean | col 12 in siteenvdata 
-      
-      siteenvdata[y,10] <- CurrentYrPredict[1,10] #dens.percomp 
-      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.percomp.change
-      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.weight.mean
-      
-    }
-    
-    FWIPwodatalist[[s]] <- siteenvdata
-    
-  }
-  
-  # rbind together all objects in datalist
-  siteenvdataagg <- bind_rows(FWIPwodatalist)
-  # add column for simnum and populate with t (outer loop iteration)
-  siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
-  # write big dataframe to big data list 
-  bigFWIPwodatalist[[t]] <- siteenvdataagg
-  
-}
-
-#lol ok now what
-
-
-F_WIP.woland_Predict = bigFWIPwodatalist %>% 
-  map_dfr(as.tibble, .name_repair = "universal")
-
-write.csv(F_WIP.woland_Predict,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures 100simnum/F_WIP.woland_Predict.csv")
-
-gc(bigFWIPwodatalist)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-#
-#
-#
-##OLD CODE, before date match reconfiguration####
-
-##2/6 quick look: this whole file might be trash now. go to CC_wl projections clean to see if you can just start there. 
-
-####Build Past Data here
-#Start with our real life data: 
-#then load in the CBP data to 2020
-CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
-
-#also, baseline
-baseline_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/baseline_69vars.csv") #baseline is 1991-2000
-#NOTE: baseline has these "depth" columns. 12 of them i guess? 1 for each season
-
-#First, fix the repeating NA problem by substituting the real life 1990 data (ie 1991 y1 data) with this complicated ass bind select filter replace bullshit:
-#here is the 1990 data, technically as the 1991 y1 data. bind ninetyone_Base to baseline in a bit, so we have real life 1991 y1 data. get it?
-ninetyone = CBP.WQ_69vars %>% filter(year == "1991") %>% 
-  select(STATION, year, contains("y1")) %>% #its 1991 y1 data
-  select(-contains("TSS")) %>% 
-  rename(Station = STATION) %>% rename(Year = year)
-
-ninetyone_Base = baseline_69vars %>% 
-  filter(Year == "1991") %>%
-  select(Station, Year, everything()) %>%
-  select(-contains("y1")) %>% #technically this will replace all the y1 variables but who cares
-  full_join(ninetyone, by = c("Station", "Year")) 
-
-#There is also another problem with NAs in certain stations in baseline that need to be replaced
-#select random complete years to fill the incomplete stations: LE5.5-W	, TF3.1E, TF3.2A, WXT0001, XHH4742
-
-#ninetyonebadstations = CBP.WQ_69vars %>% 
-  filter(STATION %in% c("LE5.5-W","TF3.1E","TF3.2A","WXT0001","XHH4742")) %>% #XHH4742 dont have data till later
-  select(STATION, year, contains("y1")) %>% 
-  select(-contains("TSS")) %>% 
-  group_by(STATION) %>% 
-  slice_sample(n = 10 , replace = T) %>% #pick a random 10 years
-  rename(Station = STATION) %>% rename(Year = year) %>%
-  mutate(Year = seq(1991, 2000, by = 1)) #just a white lie about what year it is
-
-#make sure you sliced and didnt get any NAs. If you see NAs, redo ninetyonebadstations:
-ninetyonebadstations %>% group_by(Year) %>% 
-       select(Year, Station, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max) %>%
-       summarise(across(everything(), ~ sum(is.na(.))))
-
-#can just run this code to fill in the NAs
-#ninetyonebadstations[] <- ninetyonebadstations %>% group_by(Station) %>%
- # lapply(.,function(x) 
- #   replace(x,is.na(x), sample(x[!is.na(x)],sum(is.na(x)))))
-
-ninetyonebadstations_Base = baseline_69vars %>% 
-  filter(Station %in% c("LE5.5-W","TF3.1E","TF3.2A","WXT0001","XHH4742")) %>%
-  select(Station, Year, everything()) %>%
-  select(-contains("y1")) %>% #technically this will replace all the y1 variables but who cares bc we only use 3
-  full_join(ninetyonebadstations, by = c("Station", "Year")) 
-
-FutureYears = as_tibble(seq(from = 2021, to = 2060, by = 1)) %>% rename("Year" = "value")
-
-####Baseline 1991-2000 data: Here is a spot where we select(only vars we need)####
-base_df =  baseline_69vars %>% 
-  filter(!Year == "1991") %>% #take out the 1991 data real quick bc we gonna bind it back
-  bind_rows(ninetyone_Base) %>% 
-  filter(!Station %in% c("LE5.5-W","TF3.1E","TF3.2A","WXT0001","XHH4742")) %>% #take out the problem stations too
-  bind_rows(ninetyonebadstations_Base) %>% 
-  filter(!Station == "LE5.5") %>%
-  #mutate(Station = replace(Station, Station == "LE5.5", "LE5.5-W")) %>%
-  bind_rows(replicate(3, ., simplify = FALSE)) %>% #then add 3 more onto the bottom of it
-  select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, #selecting only what we use
-         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax,
-         Chla.spme, Chla.summe, Chla.summax, Sal.summed, Sal.spme, Sal.summe, 
-         Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe) %>% 
-  arrange(Station, Year) %>% 
-  select(-Year) %>%
-  group_by(Station) %>%
-  mutate(slice_sample(FutureYears, n = 40, replace = F)) %>% #HERE, create the years that these baseline years will match up with
-  mutate(base = rep("base", n = 40)) %>%
-  select(Station, Year, everything()) %>%
-  arrange(Station, Year) %>% 
-  ungroup()
-
-#na check:
-#most of the NAs are from 1991 y1s, lots in the depth column too
-View(base_df %>% group_by(Station)%>%
-       summarise(across(everything(), ~ sum(is.na(.))))) %>% 
-#       select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe))
-
-#base_df shouldnt need changing now.
-
-##Three Future datasets here####
-#To then build the dataframe of all future values, first create the "scalar" dataset, the change values for the future: 
-#load in projections for each scenario
-CC.wland_2021_2060_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CC.wland_2021_2060_69vars.csv") 
-WIP.wland_2021_2060_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/WIP.wland_2021_2060_69vars.csv")
-WIP.woland_2031_2060_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/WIP.woland_2031_2060_69vars.csv")
-
-#Tidying up the Projection data####
-#Starting with CC.wland: Here is a spot where we select(only vars we need)####
-# proactively fix the y1 problem here by grabbing 2020 data, which will become the 2021 y1 data after some magic
-twentyone = CBP.WQ_69vars %>% filter(year == "2020") %>%
-  select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
-  group_by(STATION) %>%
-  #slice_sample(n = 1 , replace = T) %>% #pick a random year
-  mutate(Year = case_when(year == 2020 ~ 2021)) %>% #change year, bc y being changed to y1
-  rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
-  rename(Station = STATION) %>%
-  select(Station, Year, everything()) %>% select(-year) %>% 
-  replace_na(list(Temp.sumy1me = 31.2550, Temp.sumy1med = 31.2550, Sal.sumy1max = 0.001)) %>% 
-  ungroup() 
-#TF5.2 is missing Temps so I used the temp from TF5.2A med = 31.2550 mean = 31.25500
-# and all of the TF stations and RET5.1A have -Inf salinities that need to be 0
-
-##Do this for each scenario
-twentyone_CC.wl = CC.wland_2021_2060_69vars %>% filter(Year == "2021") %>%
-  #select(Station, Year, everything()) %>%
-  select(-Temp.sumy1med, -Temp.sumy1me, -Sal.sumy1max) %>% 
-  full_join(twentyone, by = c("Station", "Year")) %>%
-  select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, #selecting only what we use
-         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax,
-         Chla.spme, Chla.summe, Chla.summax, Sal.summed, Sal.spme, Sal.summe, 
-         Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe)
-
-####Here is a spot where we select(only vars we need)####
-CC.wl_2021_2060 = CC.wland_2021_2060_69vars %>% filter(!Year == "2021") %>%
-  bind_rows(twentyone_CC.wl) %>%
-  filter(!Station == "LE5.5") %>% #take this out bc we have 5.5-W instead. alsp TF5.5 is trash and we have 5.5A
-  #mutate(Station = replace(Station, Station == "LE5.5", "LE5.5-W")) %>%
- # replace_na(list(Temp.sumy1me = 27.489, Temp.sumy1med = 26.74)) %>% #its just two stations, LE5.5-W and XHH4742 that have 2021 NAs. replaced w a median point but still a salinity problem so use the lapply code below
-  select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, #selecting only what we use
-         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax,
-         Chla.spme, Chla.summe, Chla.summax, Sal.summed, Sal.spme, Sal.summe, 
-         Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe) %>% 
-  arrange(Station, Year) %>%
-  ungroup()
-#na check
-#nas are because there is no 2021 y1 data, which is why we do the twentyone_CC fix above.
-View(CC.wl_2021_2060 %>% group_by(Station, Year) %>% 
-       summarise(across(everything(), ~ sum(is.na(.))))) #%>%
-     #  select(Station, Year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe))
-#if still one NA, you can do this: 
-#this code is supposed to replace NAs in the df with a random selection from the column
-#CC.wl_2021_2060[] <- CC.wl_2021_2060 %>% group_by(Station) %>%
-#  lapply(.,function(x) 
-#    replace(x,is.na(x), sample(x[!is.na(x)],sum(is.na(x)))))
-
-
-#Chris' Notes:: ####
-#The forecast is based on a baseline set from 1991- 2000
-#So I think we create a vector of years from 1990 to 2020 than randomly select, with replacement, 30 years. Ie. 2002, 2017, 2004, 2011, etc, etc,
-#Then we stack those years up to create a randomly generated 30 year record from 2021 to 2050. 
-#Then we add on the delta values for each year to create that vector of change. 
-#Then we run the predictions for SAV stepwise and save those outputs.
-#Then we do it again and again 1000 times in a row.  
-
-allyr = CC.wl_2021_2060 %>% select(Year) #select the uears and stations (5760) for pasting
-allsta = CC.wl_2021_2060 %>% select(Station)
-
-
-#HMM: shouldnt this be Future - Baseline = future delta change??? I had it the other way initially...
-deltaCC.wl1 = (CC.wl_2021_2060 %>% select(-Year, -Station)) - ((base_df %>% select(-Year, -Station))) 
-
-#Delta Change DF####
-#add the year and station columns back in to create Delta change DF
-deltaCC.wl_df = CC.wl_2021_2060 %>% 
-  group_by(Station) %>% 
-  bind_rows(base_df) %>% 
-  arrange(Year, Station) %>%
-  group_by(Station, Year) %>%
-  select(-base) %>%
-  summarise(across(everything(), ~.x - lead(.x))) %>%
-  drop_na()
-  
-  
-  
-  
-  deltaCC.wl1 %>% #should be 5760
-  mutate(CC.wl_2021_2060 %>% select(Year)) %>% 
-  mutate(CC.wl_2021_2060 %>% select(Station)) %>% 
-  filter(!Station == "LE5.5") %>% #take this out bc we have 5.5-W instead. alsp TF5.5 is trash and we have 5.5A
-  select(Station, Year, everything()) %>%
-  rename(STATION = Station) %>%
-  arrange(STATION, Year)  
-
-#nacheck
-#LE5.5 & XHH4742 have Sal.sumy1 NAs unless you do the lapply code or insert values
-View(deltaCC.wl_df %>% summarise(across(everything(), ~ sum(is.na(.)))))
-
-#select random years from the real life CBP WQ data to generate a DF that is the "NO Climate Change" prediction df. Basically meaning that, for the next 40 years, every year is just goign to be the same as one of the last set of years 
-####No Climate Change scenario df: Here is a spot where we select(only vars we need)####
-NoCC_df = CBP.WQ_69vars %>% 
-  select(STATION, year, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, #selecting only what we use
-         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax,
-         Chla.spme, Chla.summe, Chla.summax, Sal.summed, Sal.spme, Sal.summe, 
-         Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe) %>%
-  filter(!STATION == "LE5.5") %>% #take this out bc we have 5.5-W instead. alsp TF5.5 is trash and we have 5.5A
-  filter(!year %in% c(1984, 1985, 1986, 2020)) %>% #filter out 84 for sure (no y1) but lots of NAs in these other first few years
-  #select(-year) %>% #take out "past" years, might need this to explore where NAs are coming from though
- # drop_na() %>% #not so sure about this but it could work since we want complete years? hmm 80 points get dropped and the DFs need to match up
-  group_by(STATION) %>%
-  slice_sample(n = 40 , replace = T) %>% #select a random 40 years from each Station. insane that this doesnt have a "select no NAs"
-#  mutate(Temp.summin = case_when(Temp.summin == "Inf" ~ 0.001, 
- #                          TRUE ~ Temp.summin)
-  #replace_na(across(Temp.sumy1med:TN.summe, sample_n(., size = 1, replace = T)) %>%
-  mutate(Year = seq(2021, 2060, by = 1)) %>% #Add in the years that will be matched up to future. Should this be randomized?
-  ungroup() #need to keep it grouped for the lapply code to work
-
-#this code is supposed to replace NAs in the df with a random selection. group_by aint workin tho... 
-#im not so sure it does that though....group_by may need to be inside the function?
-#NoCC_df[] <- NoCC_df %>% group_by(STATION) %>%
-#lapply(.,function(x) 
-#   replace(x, is.na(x), sample(x[!is.na(x)],sum(is.na(x)))))
-
- #Check nas
-View(NoCC_df %>% group_by(STATION, year) %>%
-       summarise(across(everything(), ~ sum(is.na(.)))))
-
-compare_df_cols(NoCC_df, deltaCC.wl_df)
-
-futureprobs = NoCC_df %>%
-  bind_rows(deltaCC.wl_df)
-
-####STOPPED HERE FOR DATA RECONFIG####
-#eventually this will be the 1000x thing, to create 1000 different predicted value DFs, but for now, 1x: 
-PredVals.CC.wl = NoCC_df %>%
-  bind_rows(deltaCC.wl_df) %>% 
-  group_by(STATION, Year) %>% select(-year) %>%
-  summarise(across(everything(), ~sum(.))) %>% #this adds the delta to the No Climate Change (CBP.WQ original data).
- # mutate(Sal.sumy1max = case_when(Sal.sumy1max < 1 ~ 1, #change all the negative (impossible) and less than 1 (will get fucked from log10()) salinities to 1
-  #                                Sal.sumy1max == "Inf" ~ 1,
-   #                               TRUE ~ Sal.sumy1max)) %>%
-  select(-year) %>%
-  ungroup() 
-
-
-is.na(PredVals.CC.wl) <- PredVals.CC.wl == "NaN"
-is.na(PredVals.CC.wl) <- PredVals.CC.wl == "Inf"
-is.na(PredVals.CC.wl) <- PredVals.CC.wl == "-Inf"
-
-View(PredVals.CC.wl %>% summarise(across(everything(), ~ sum(is.na(.)))))
-
-###quick graph check####
-ggplot() +
-  stat_summary(data = CC.wland_2021_2060_69vars %>% filter(Station == "CB7.1"), aes(x = Year, y = Temp.summe),
-               geom = "smooth", fun.data = mean_se, color = "blue") +
-  stat_summary(data = PredVals.CC.wl %>% filter(Station == "CB7.1"), aes(x = Year, y = Temp.summe),
-               geom = "smooth", fun.data = mean_se, color = "green") +
-  stat_summary(data = baseline_69vars %>% filter(Station == "CB7.1"), aes(x = Year, y = Temp.summe),
-               geom = "smooth", fun.data = mean_se, color = "purple") +
-  stat_summary(data = CBP.WQ_69vars %>% filter(STATION == "CB7.1"), aes(x = year, y = Temp.summe),
-               geom = "smooth", fun.data = mean_se, color = "pink") +
-  labs(x = "", y = expression("Temp, summer mean, station CB7.1")) +
-  theme(axis.line = element_line(colour = "black"), text = element_text(size=13),
-        axis.text.x = element_text(angle=0, vjust=, hjust =.5, color = "black"),
-        legend.position = "right", panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(), panel.border = element_blank(),
-        panel.background = element_blank())
-
-#####Here is the "Prediction under Climate Change DF, done once, for the CC WLand scenario####
-
-#Predict Zostera
-
-#LMER from Zostera SEM (from community change model building.R)
-
-#####
-
-ZoInt.lmer <- lme(dens.percomp.change ~ dens.percomp.y1  + log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)), random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQ69sem.No0 %>% filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3"))) #removing these now doesnt change the significance but still might be a good idea. 772 to 647 observations
-summary(ZoInt.lmer)
-car::Anova(ZoInt.lmer)
-
-#need Zos only density data?
-ZoDensTime = read.csv("~/Documents/R projects/Predicting-SAV/data/ZoDensTime.csv")  %>%
-  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3")) #%>% rename(Station = STATION) #take out this station w no grass
-
-#build the newdata
-
-##########LETS JUST FUCKING DO IT ROW BY ROW########
-str(PredVals.CC.wl)
-
-#only need one row of ZoDensTime per station
-ZDT2019 = ZoDensTime %>% filter(year == "2019") %>% 
-  mutate(Year = case_when(year == 2019 ~ 2020)) %>% # we just gonna pretend this is 2020 data 
-  select(STATION, Year, dens.percomp)
-
-#Grab the 2021 data we are missing for Zostera. this is a Zostera only solution unfortunately
-twentyone_Tempsummed = twentyone %>% select(STATION, Year, Temp.summed) %>%
-  filter(STATION %in% ZoDensTime$STATION) %>%
-  rename(Temp.sumy1med = Temp.summed) #bind this to the Zostera data 
-
-#ZoPredVals_CC.wl = PredVals.CC.wl %>% #Projected Future Env Variables
-#  select(STATION, Year, Temp.sumy1med, Sal.summed, Chla.spme, Secc.summe, Temp.spmed) %>% #select what we need only, based on ZoInt formula
-#  filter(STATION %in% ZoDensTime$STATION) %>% #Zostera stations only
-#  add_column(dens.percomp = rep(NA, 800)) %>% #add in a Density column
-#  bind_rows(ZDT2019) %>%
-#  select(-Temp.sumy1med) %>%
-#  select(STATION, Year, dens.percomp, everything()) %>% 
-#  arrange(STATION, Year) %>% #runa bove this
-#  left_join(fullTemp)
-  
-#fullTemp = ZoPredVals_CC.wl %>% select(STATION, Year, Temp.sumy1med) %>% drop_na()
-
-write.csv(ZoPredVals_CC.wl, "~/Documents/R projects/Predicting-SAV/data/ZoPredVals_CC.wl.csv")
-
-coef(ZoInt.lmer)
-
-PredictZo2021 = ZoPredVals_CC.wl %>% 
-  group_by(STATION) %>%
-  mutate(dens.percomp.y1 = lag(dens.percomp, order_by = Year)) %>% #recreate the dpcy1 column so its all on one row
-  filter(Year == 2021) %>%#lest just try one year for now
-  select(-dens.percomp, -Year) %>% #this builds the 2021 DF completed
-  drop_na() %>% ungroup() %>%
-  mutate(DPCC = predict(ZoInt.lmer, newdata = .)) %>%
-  mutate(dens.percomp = DPCC + dens.percomp.y1)
- 
-  
-  # summarise(pred.DC = ((-1.832017*dens.percomp.y1) +
-  #                    (-1.61951*log10(Temp.sumy1med)) +
-  #                    (-0.2834316*log10(Sal.summed)) +
- #                     (-0.1102446 *log10(Chla.spme)) +
- #                     (0.2961508*log10(Secc.summe)) +
- #                     (0.3499578*(dens.percomp.y1:log10(Temp.spmed)))+
- #                     (1.594469*(dens.percomp.y1:log10(Sal.summed)))+
- #                     (0.01992432*(dens.percomp.y1:log10(Chla.spme)))+ 
- #                     (-0.0672103*(dens.percomp.y1:log10(Secc.summe)))))
-
-
-DPCC2021 = predict(ZoInt.lmer, newdata = PredictZo2021)
-
-#can we make a fuunction
-predict.ZoInt <- function(x) {
-  fit <- ZoInt.lmer <- lme(dens.percomp.change ~ dens.percomp.y1  + log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)), random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1), control = lmeControl(opt = "optim"), data = ZoDensWQ69sem.No0) 
-  pred <- predict(fit, newdata = PredVals.CC.wl[x+1, ], se.fit = TRUE)
-  c(summary(fit)$adj.r.squared, pred$fit, pred$se.fit)
-}
-
-predict.ZoInt(PredVals.CC.wl)
-
-
-rolling_Zo <- rollify(~median(.x, na.rm = T), window = 10)
-
-####
-ZoDensFuture_CC.wl <- PredVals.CC.wl %>%
-  filter(STATION %in% ZoDensTime$STATION) %>% #grab just the stations in the ZoZone
-###ACTUALLY: what we need to do here is to grab 2019 and 2020 rows from the real data to use here.  
-  full_join(ZoDensTime %>% filter(year == "2019")) %>% #Grab 2019 grass only 
-  select(-oYear, -year) %>% 
-  select(STATION, Year, dens.percomp.change, dens.percomp.y1, Temp.sumy1med, Sal.summed, Chla.spme, Secc.summe, Temp.spmed, Sal.summed)  %>% #for drop_na, try to select only the things you need bc itll drop too many points
-  drop_na() #NOTE: using y1 here drops 2021 data bc there isnt a sumy1 for 2021... 
-
-#predict
-ZoDPCFut_CC.wl  <- predict(ZoInt.lmer, newdata = ZoDensFuture_CC.wl, re.form = ~(1|STATION), interval = "confidence")
-#do i need to do bootstrapped CI?
-
-#put the predicted in the DF
-ZoFuture_CC.wl = ZoDensFuture_CC.wl %>% add_column(DPC_predict = ZoDPCFut_CC.wl)
-
-
-
-ZoDPC2022_CC.wl  <- predict(ZoInt.lmer, newdata = ZoDensFuture_CC.wl %>% filter(Year == 2022), re.form = ~(1|STATION), interval = "confidence")
-
-ZoDPC2022_CC.wl + dens.percomp.y1 = dens.percomp.2022
-
-#put the predicted in the DF
-ZF2022 = ZoDensFuture_CC.wl %>% filter(Year == 2022) %>%
-  add_column(DPCC_2022 = as.numeric(predict(
-    ZoInt.lmer, newdata = ., re.form = ~(1|STATION)))) %>%   
-  group_by(STATION) %>% 
-  mutate(DPC_2022 = DPCC_2022 + dens.percomp.y1) %>%
-  add_column(DPCC_2023 = predict(ZoInt.lmer, newdata = ZoDensFuture_CC.wl %>% filter(Year == 2023), re.form = ~(1|STATION), interval = "confidence"))
-
-
-
-
-
-#############
-##IF this is right, here would be the full workflow that needs to be repeated 1000x: 
-
-predtest1 = CBP.WQ_69vars %>% #start w the NO CC data
-  select(-contains("TSS")) %>% #no TSS in the climate data so remove this
-  rename(oYear = year) %>% 
-  group_by(STATION) %>%
-  slice_sample(n = 40 , replace = T) %>% #select a random 40 years from each Station
-  mutate(Year = seq(2021, 2060, by = 1)) %>% #Add in the years that will be matched up to future
-  select(STATION, Year, oYear, everything()) %>% #%>% rownames_to_column()  
-  ungroup() %>%
-  bind_rows(deltaCC.wl_df) %>% #Year and Station will match up to bind
-  group_by(STATION, Year) %>%
-  summarise_all(sum) %>%  #this adds the delta to the CBP.WQ original data
-  filter(STATION %in% ZoDensTime$STATION) %>% #grab just the stations in the ZoZone
-  full_join(ZoDensTime %>% filter(year == "2019")) %>% #Grab 2019 grass only
-  select(-oYear) %>% 
-  select(STATION, Year, dens.percomp.change, dens.percomp.y1, Temp.sumy1med, Sal.summed, Chla.spme, Secc.summe, Temp.spmed, Sal.summed)  %>% #for drop_na, try to select only the things you need bc itll drop too many points
-  drop_na() %>%
-  add_column(pred.DPC = predict(ZoInt.lmer, newdata = ., re.form = ~(1|STATION), interval = "confidence")) %>% #add in the predicteds
-  select(STATION, Year, pred.DPC, )
-
-
-
-
-
-#use that formula to precict area (dens.weight.mean)
-preZoFut_CC.wl <-predict(ZoFuture_CC.wl) #this lme is the dens.percomp.change
-predZoFutdwm_CC.wl <- preZoFut_CC.wl * ZoDensFuture_CC.wl$denscomp.max
-
-#prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
-#summary(prdSEM.lm)
-
-
-
-
-##First cut, wrong but dont delete yet####
-#First, create a random vector of years (selected random w replacement) for each station, parameter, (and each decade????)
-
-
-CC.w_Rand.2130 = CC.wland_2021_2060_69vars %>%
-  group_by(Station) %>% 
-  filter(between(Year, 2021, 2030)) %>% #if decade scalars are real, then need to do this i guess? 
-  slice_sample(n = 10 , replace = T) %>% #n = 10, if doing by decade?
-  
-  #this gives me 10 rows per station. so then id need to do baseline - these for a decade scalar. 
- 
-#scalar calculation for 2021-2030. do this by decade bc the scalars should change w decade?
-  scal_CC.w = (baseline_69vars  %>% select(-Year, -Station)) - (CC.wland_2021_2060_69vars %>% filter(between(Year, 2021, 2030)) %>% select(-Year, -Station))
-
-baseYr = baseline_69vars$Year
-baseSt = baseline_69vars$Station
-
-#this DF is the difference (i.e., the scalar?) between baseline and 2021-2030 decade
-delta_CC.w2130 = scal_CC.w %>% 
-  add_column(baseline_69vars$Year) %>% add_column(baseline_69vars$Station) %>% 
-  add_column(Decade = "2020s") %>%
-  rename(Year = "baseline_69vars$Year", Station = "baseline_69vars$Station") %>%
-  select(Year, Station, Decade, everything())
-
-
-
-##TEST: Project Ruppia in to 2021-2030
-
-delta_CC.w2130.spring = delta_CC.w2130 %>% 
-  select(Station, Chla.spme, Secc.spme, Sal.spme, Temp.spme, TP.spme, TN.spme) %>%
-  rename(STATION = Station)
-
-Ru2130WQ = RuDensWQsem.No0 %>% filter(year == 2019) %>%
-  inner_join(delta_CC.w2130.spring, by = "STATION") %>% 
-  group_by(STATION) %>%
-  summarise(Chla.spme = Chla.spme.x - Chla.spme.y)
-
-RuDensWQsem.No0
-
-#Ruppia
-RuInt <- lme(dens.percomp.change ~ dens.percomp.y1 +
-               # log10(Sal.spme) + log10(Chla.spme) + 
-               log10(TP.spme) + log10(TN.spme) + log10(Secc.spme) + log10(Temp.spme) +
-               (dens.percomp.y1:log10(Sal.spme)) + (dens.percomp.y1:log10(Chla.spme)) + 
-               (log10(TP.spme):dens.percomp.y1) + (log10(TN.spme):dens.percomp.y1) +
-               (log10(Secc.spme):dens.percomp.y1) + (log10(Temp.spme):dens.percomp.y1),
-             random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1),
-             control = lmeControl(opt = "optim"), data = RuDensWQsem.No0)
-
-#use that formula to precict area (dens.weight.mean)
-preRuInt <-predict(RuInt) #this lme is the dens.percomp.change
-pred.Rudwm <- preRuInt * RuDensWQsem.No0$denscomp.max
-
-#prdSEM.lm <- lm(dens.weight.mean ~ dens.weight.mean.y1 + pred.dwm, data = Rm_SEM)
-#summary(prdSEM.lm)
-
-RuPred.lmer <- lme(dens.weight.mean ~ dens.weight.mean.y1 + pred.Rudwm, 
-                   random = ~ 1 | STATION, correlation = corARMA(form = ~ 1 | STATION, q = 1),
-                   control = lmeControl(opt = "optim"), data = RuDensWQsem.No0)
-
-summary(RuPred.lmer)
-r2(RuPred.lmer)
-  
-  
