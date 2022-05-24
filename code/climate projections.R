@@ -1,5 +1,5 @@
 #Code for Climate Projections of Chesapeake Bay SAV communities#
-library(tidyverse); library(janitor); library(lme4); library(car); library(vroom)
+library(tidyverse); library(janitor); library(lme4); library(car); library(vroom); library(performance)
 
 #5/12/22: Can skip down to 103 and load those DFs. Start loading data with line 11 to build all the previous data
 
@@ -11,7 +11,7 @@ library(tidyverse); library(janitor); library(lme4); library(car); library(vroom
 ####DFs needed for ALL loops but not in loop####
 ##SAV Density and WQ per Community over past time#
 #SAVCommDensWQ_69sem.No0 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69sem.No0.csv")
-SAVCommDensWQ_ForPred = vroom("http://github.com/mhensel/Predicting-SAV/blob/e5d4a7cbbb27c29ca1d0f2dbbd4f5b7becce7db2/data/SAVCommDensWQ_forPredictions.csv") #past water quality and sav data 
+SAVCommDensWQ_ForPred = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv") #past water quality and sav data 
 
 SAVWQallClean = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean.csv") #2000-2020 water quality and sav data, medians filling in NAs in order to feed properly into the models
 
@@ -23,7 +23,7 @@ future_yrs = seq(2020, 2060, by = 1) #should this be 2021
 #check the ENV vars and the replace_na for each community here!
 
 #Zostera Initial and Model####
-Zostera_initialDPC = SAVCommDensWQ_ForPred %>% #Do this separate for each community
+Zostera_initialDPC = SAVCommDensWQ_ForPred %>% #why is this diff than allClean. ####
   ungroup() %>%
   filter(SpCluster == "Zostera") %>%
   filter(!STATION %in% c("LE5.5-W")) %>% #seriously fuck this station
@@ -37,17 +37,22 @@ Zostera_initialDPC = SAVCommDensWQ_ForPred %>% #Do this separate for each commun
 zos_station = Zostera_initialDPC$STATION
 
 #DF and model for Zostera
-ZoDensWQsem.No0_Predict = SAVWQallClean %>% #allclean is the 2000-2020 data! 
+ZoDensWQsem.No0_Predict = SAVCommDensWQ_69sem.No0 %>% #allclean is the 2000-2020 data! 
+  filter(between(year, 2000, 2020)) %>%
   filter(SpCluster == "Zostera") %>%
   filter(!STATION %in% c("LE5.5-W")) %>% #seriously fuck this station
   filter(!denscomp.max < 1) %>%
   ungroup() %>% 
-  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max, dens.percomp, 
          Chla.spme, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>%
   drop_na() %>% #1214 points
   as.data.frame()
 
-ZoInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1  + log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)) + (1|STATION), data = ZoDensWQsem.No0_Predict)
+ZoInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1  + 
+                     log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + 
+                     (dens.percomp.y1:log10(Temp.spmed)) +  
+                     (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)) + (1|STATION), data = ZoDensWQsem.No0_Predict)
+r2(ZoInt.lmer)
 
 #Ruppia Initial and Model####
 Ruppia_initialDPC = SAVCommDensWQ_ForPred %>% #Do this separate for each community
@@ -100,6 +105,7 @@ MMDensWQsem.No0_Predict = SAVWQallClean %>% #allclean is the 2000-2020 data!
 
 MMInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1 +log10(TN.summe):dens.percomp.y1+ log10(Temp.summin):dens.percomp.y1 + (1|STATION), data = MMDensWQsem.No0_Predict)
 
+r2(MMInt.lmer)
 #Fresh Initial and Model####
 Fresh_initialDPC = SAVCommDensWQ_ForPred %>% #Do this separate for each community
   ungroup() %>%
@@ -123,8 +129,14 @@ FreshDensWQsem.No0_Predict = SAVWQallClean %>% #allclean is the 2000-2020 data!
   mutate(Sal.summe = Sal.summe + .1) %>%
   as.data.frame()
 
-FInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 +log10(Sal.summe) + log10(Chla.summe) + log10(TP.summe)  + log10(Temp.sumy1me) +log10(Temp.summe)  + log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1 + (1|STATION), data = FreshDensWQsem.No0_Predict)
-
+FInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + 
+                    log10(Sal.summe) + log10(Chla.summe) + log10(TP.summe)  + 
+                    log10(Temp.sumy1me) +log10(Temp.summe)  + 
+                    log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + 
+                    log10(TP.summe):dens.percomp.y1  +log10(Temp.sumy1me):dens.percomp.y1 + 
+                    (1|STATION), data = FreshDensWQsem.No0_Predict)
+r2(FInt.lmer)
+check_singularity(FInt.lmer)
 
 #
 ##
@@ -162,12 +174,15 @@ CC.wland_OneFuture = CC.wland_OneFuture.no2021 %>% #OneFuture is a nisnomer... t
 
 #vroom_write(CC.wland_OneFuture, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/CC.wland_OneFuture.csv")
 
+#CC.wland_OneFuture = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/CC.wland_OneFuture.csv")
+
 #Zostera.OneBay_CC####
 Zostera.OneBay_CC = CC.wland_OneFuture %>% 
   rename("STATION" = "Station", "year" = "Year") %>%
   filter(STATION %in% Zostera_initialDPC$STATION) %>% 
   select(STATION, year, Year.ref,
-         Chla.spme, TP.spmed, TN.spme, Secc.summe, 
+         Chla.spme, #TP.spmed, 
+         TN.spme, Secc.summe, 
          Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>% 
   nest_by(year, Year.ref) %>% 
   drop_na() %>% #one set of sims uses 2020 as a reference for 2021 and it comes up as NA
@@ -278,32 +293,36 @@ vroom_write(Fresh.OneBay_CC,"/Volumes/savshare2/Current Projects/Predicting-SAV/
 Zostera.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zostera.OneBay_CC.csv")
 Ruppia.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ruppia.OneBay_CC.csv")
 MixMeso.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/MixMeso.OneBay_CC.csv")
-Fresh.OneBay_CC = vroom("https://github.com/mhensel/Predicting-SAV/blob/3470cb4ad7b9d3b8ac6499a4467afd7cd7d38619/data/Fresh.OneBay_CC.csv")
+Fresh.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_CC.csv")
 #IntoTheOneTrueMultiverse 1: Zostera OneTrueBay CC####
 bigZodatalist = list()
 
-for (t in 1:100){ 
-  #t = 2
+for (t in 1:5){ 
+ # t = 2
   Zos.OTB_CC = Zostera.OneBay_CC[Zostera.OneBay_CC$simnum_OB == t,] 
   
   Zodatalist = list()
   
   for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
-    # s = 3
+   #  s = 3
     #subset data by site
     siteenvdata <- Zos.OTB_CC[Zos.OTB_CC$STATION == zos_station[s],] 
     # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
     siteenvdata$dens.percomp.change = NA  
     siteenvdata$dens.weight.mean = NA
     siteenvdata <- as.data.frame(siteenvdata)
-    
+    datapred.y = ZoDensWQsem.No0_Predict #%>%  #here
+     # select(year, STATION, Chla.spme, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme, denscomp.max, dens.percomp.change, dens.weight.mean) 
     
     for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
-      #  y = 3
-      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],12] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+   #     y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
       thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
       
+
+      
       CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+      #  select(-simnum_OB) %>%
         mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
         mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
         mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
@@ -311,16 +330,33 @@ for (t in 1:100){
                                         TRUE ~ dens.percomp)) %>%
         mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
         mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
-                                            TRUE ~ dens.weight.mean))
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.percomp.y1 = dens.percomp.y1)
       
       
       #col 11 in CYP = dens.percomp | col 11 in siteenvdata
       #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
       #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
       
-      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.percomp
-      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.percomp.change
-      siteenvdata[y,15] <- CurrentYrPredict[1,15] #dens.weight.mean
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.mean
+      
+  datapred.y = datapred.y %>% #Trying adaptive modelling here####
+   bind_rows(CurrentYrPredict) %>% 
+    group_by(STATION) %>%
+    arrange(desc(year)) %>%
+    slice_head(n = 20) %>% #select the 20 most recent years
+    ungroup()
+    
+      
+#Update thisyearinfo here, AND update the input into the mixed model
+#update dens.percomp.y1
+#drop the oldest year from the datapred.y
+  
+      ZoInt.lmer <- lm(dens.percomp.change ~ dens.percomp.y1  +  log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) +  (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ 
+      (dens.percomp.y1:log10(Secc.summe)), data = datapred.y)
+      #i switched over to the lm because the random effect is STATION
       
     }
     
@@ -331,11 +367,12 @@ for (t in 1:100){
   # rbind together all objects in datalist
   siteenvdataagg <- bind_rows(Zodatalist)
   # add column for simnum and populate with t (outer loop iteration)
-  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1])) #We will need to bring this back
   # write big dataframe to big data list 
   bigZodatalist[[t]] <- siteenvdataagg
   
 }
+
 
 
 #BigZosData####
@@ -343,6 +380,23 @@ Zo_CC.PredOneTrueBae = bigZodatalist %>%
   map_dfr(as_tibble, .name_repair = "universal")
 
 vroom_write(Zo_CC.PredOneTrueBae,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_CC.PredOneTrueBae.csv")
+
+#test figs
+ggplot(data = Zo_CC.PredOneTrueBae)+ #%>% filter(between(simnum_OB, 1, 3)) ) +
+  #geom_point(aes(x = year, y = dens.percomp.change, group = STATION, color = simnum_OB), position = position_jitter()) +
+  stat_summary(data = ZCC.otbNonAdapt %>% filter(between(simnum_OB, 1, 2)),
+               aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9, color = "darkgreen") +
+ # stat_smooth(data = ZCC.otbNonAdapt %>% filter(between(simnum_OB, 1, 2)),
+ #             aes(x = year, y = dens.percomp.change, group = simnum_OB), method = "lm", color = "blue") +
+  stat_summary(aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9, color = "brown2") +
+  # stat_smooth(aes(x = year, y = dens.percomp.change, group = simnum_OB), method = "lm", color = "black") +
+  stat_summary(data = ZoDensWQsem.No0_Predict, aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9) #+
+  #stat_smooth(data = ZoDensWQsem.No0_Predict, aes(x = year, y = dens.percomp.change, group = STATION), method = "lm") 
+
+ZCC.otbNonAdapt = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_CC.PredOneTrueBae.csv")
+
+#SO: the adaptive modelling works best with using the original _69 WQ data. the problem might be the spring but its hard to say
+#I'm going to try growing season now with the allclean
 
 #biglist, not needed anymore.
 gc(bigZodatalist)
@@ -567,11 +621,13 @@ gc(bigFdatalist)
 #Do OneBay_WIP next####
 WIP.wland_OneFuture = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/WIP.wland_OneFuture.csv")
 #Zostera.OneBay_WIP####
+#Zostera.OneBay_CC####
 Zostera.OneBay_WIP = WIP.wland_OneFuture %>% 
   rename("STATION" = "Station", "year" = "Year") %>%
   filter(STATION %in% Zostera_initialDPC$STATION) %>% 
   select(STATION, year, Year.ref,
-         Chla.spme, TP.spmed, TN.spme, Secc.summe, 
+         Chla.spme, #TP.spmed, 
+         TN.spme, Secc.summe, 
          Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>% 
   nest_by(year, Year.ref) %>% 
   drop_na() %>% #one set of sims uses 2020 as a reference for 2021 and it comes up as NA
@@ -687,6 +743,86 @@ Fresh.OneBay_WIP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/dat
 #IntoTheOneTrueMultiverse 1: Zostera OneTrueBay WIP####
 bigZodatalist = list()
 
+bigZodatalist = list()
+
+#adaptive test
+for (t in 1:5){ 
+  # t = 2
+  Zos.OTB_WIP = Zostera.OneBay_WIP[Zostera.OneBay_WIP$simnum_OB == t,] 
+  
+  Zodatalist = list()
+  
+  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    #  s = 3
+    #subset data by site
+    siteenvdata <- Zos.OTB_WIP[Zos.OTB_WIP$STATION == zos_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.mean = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    datapred.y = ZoDensWQsem.No0_Predict #%>%  #here
+    # select(year, STATION, Chla.spme, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme, denscomp.max, dens.percomp.change, dens.weight.mean) 
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      #     y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        #  select(-simnum_OB) %>%
+        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.percomp.y1 = dens.percomp.y1)
+      
+      
+      #col 11 in CYP = dens.percomp | col 11 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.mean
+      
+      datapred.y = datapred.y %>% #Trying adaptive modelling here####
+      bind_rows(CurrentYrPredict) %>% 
+        group_by(STATION) %>%
+        arrange(desc(year)) %>%
+        slice_head(n = 20) %>% #select the 20 most recent years
+        ungroup()
+      
+      
+      #Update thisyearinfo here, AND update the input into the mixed model
+      #update dens.percomp.y1
+      #drop the oldest year from the datapred.y
+      
+      ZoInt.lmer <- lm(dens.percomp.change ~ dens.percomp.y1  +  log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) +  (dens.percomp.y1:log10(Temp.spmed)) +  (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ 
+                         (dens.percomp.y1:log10(Secc.summe)), data = datapred.y)
+      #i switched over to the lm because the random effect is STATION
+      
+    }
+    
+    Zodatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Zodatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1])) #We will need to bring this back
+  # write big dataframe to big data list 
+  bigZodatalist[[t]] <- siteenvdataagg
+  
+}
+
+#original
 for (t in 1:100){ 
   #t = 2
   Zos.OTB_WIP = Zostera.OneBay_WIP[Zostera.OneBay_WIP$simnum_OB == t,] 
@@ -750,6 +886,19 @@ Zo_WIP.PredOneTrueBae = bigZodatalist %>%
 qplot(data = Zo_WIP.PredOneTrueBae, x = year, y = dens.percomp.change, group = STATION, geom = "smooth")
 
 vroom_write(Zo_WIP.PredOneTrueBae,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_WIP.PredOneTrueBae.csv")
+
+ggplot(data = Zo_WIP.PredOneTrueBae)+ #%>% filter(between(simnum_OB, 1, 3)) ) +
+  #geom_point(aes(x = year, y = dens.percomp.change, group = STATION, color = simnum_OB), position = position_jitter()) +
+  stat_summary(data = ZWIP.otbNonAdapt %>% filter(between(simnum_OB, 1, 2)),
+               aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9, color = "darkgreen") +
+  # stat_smooth(data = ZWIP.otbNonAdapt %>% filter(between(simnum_OB, 1, 2)),
+  #             aes(x = year, y = dens.percomp.change, group = simnum_OB), method = "lm", color = "blue") +
+  stat_summary(aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9, color = "brown2") +
+  # stat_smooth(aes(x = year, y = dens.percomp.change, group = simnum_OB), method = "lm", color = "black") +
+  stat_summary(data = ZoDensWQsem.No0_Predict, aes(x = year, y = dens.percomp, group = STATION), geom = "line", size = .9) #+
+#stat_smooth(data = ZoDensWQsem.No0_Predict, aes(x = year, y = dens.percomp.change, group = STATION), method = "lm") 
+
+ZWIP.otbNonAdapt = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_WIP.PredOneTrueBae.csv")
 
 #biglist, not needed anymore.
 gc(bigZodatalist)
@@ -1000,7 +1149,7 @@ ZosFutureIsPast.df = SAVWQallClean %>% filter(SpCluster == "Zostera") %>%
   select(simnum_OB, year, STATION, everything())
 
 
-#IntoTheOneTrueMultiverse 1: Zostera OneTrueBay WIP####
+#Future is past 1: Zostera OneTrueBay WIP####
 bigZodatalist = list()
 
 for (t in 1:2){ 

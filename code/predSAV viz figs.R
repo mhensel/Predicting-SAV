@@ -1,4 +1,4 @@
-library(tidyverse); library(ggsci); library(ggthemes); library(patchwork); library(viridis)
+library(tidyverse); library(ggsci); library(ggthemes); library(patchwork); library(geomtextpath)
 
 #scale_color_aaas() from ggsci
 zo.col = "darkolivegreen3"
@@ -840,7 +840,7 @@ AllCommsDPCC_CC.wland
   scale_color_manual(values = colorme) +
   theme(plot.margin = unit(c(.3, 1, .3, 1.5), "cm"), 
         panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "")
-AllCommsDWM_CC.wland
+
 
 
 #FIg 4: AllCommsDWM_cc####
@@ -924,7 +924,6 @@ FWIP.wlbasin = F_WIP.wland_Predict %>%
 
 
   #ZWIP.wl WIP.wland####
-#3/11/22 ADDED #####
 ZWIP.wl = Zo_WIP.wland_Predict %>% 
     add_column(., SpCluster = "Zostera") %>%
     mutate(Area = predict(dwm.to.HA_Zo, newdata = .)) %>%
@@ -1337,7 +1336,7 @@ fullBay.Scenario
 #fullBay.ScenarioBasin #####
 #by basin
 allcommbasin_byyear_CC = allcommbasin_CC.df %>% 
-  add_column(., Scenario = "CC.wland") %>%
+  add_column(., Scenario = "No Act") %>%
   mutate(BASIN = case_when(BASIN == "VA MAIN" ~ "VA MD MAIN", 
                            BASIN == "MD MAIN" ~ "VA MD MAIN", 
                            BASIN == "MD UPPER ES" ~ "MD WS ES", 
@@ -1352,7 +1351,7 @@ allcommbasin_byyear_CC = allcommbasin_CC.df %>%
   summarise(across(DWM.total:Area.total, ~ sum(.x, na.rm = TRUE)))
 
 allcommbasin_byyear_WIPwl = allcommbasin_WIP.wl.df %>% 
-  add_column(., Scenario = "WIP.wl") %>%
+  add_column(., Scenario = "Nut Reduct") %>%
   mutate(BASIN = case_when(BASIN == "VA MAIN" ~ "VA MD MAIN", 
                            BASIN == "MD MAIN" ~ "VA MD MAIN", 
                            BASIN == "MD UPPER ES" ~ "MD WS ES", 

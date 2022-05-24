@@ -47,6 +47,7 @@ SAVCommunityDens_AllStations =read.csv("/Volumes/savshare2/Current Projects/Pred
 #use this one, w the 0s filtered
 #SAVWQallClean = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_semForPredictions.csv") #this is named SAVCommDensWQ_ForPred on the other file
 SAVWQallClean = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean.csv") 
+SAVWQallClean_85 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean 1985-2020.csv")
 
 
 dwm.to.HA_Zo = lm(SAVArea ~ dens.weight.mean, data = SAVCommDensWQ_ForPred %>% 
@@ -310,6 +311,9 @@ allcomm_pastSAVWQ85.df = full_join(allcomm_past85.df, allcomm_pastWQ85.df)
 #            DPCC.mean = mean(dens.percomp.change, na.rm = T)) %>%
 #  filter(!SpCluster == "RuZo") %>% ungroup()
 
+qplot(data = allcomm_pastSAVWQ85.df, x = year, y = TN.summe, geom = "smooth") +
+  stat_summary(aes(x = year, y = TN.summe), geom = "pointrange", fun.data = "mean_se")
+
 #Build Figures of Interest####
 
 #Figures to show OneBay Scenario effects on Env Vars####
@@ -324,14 +328,14 @@ WIP.temp = Zostera.OneBay_WIP %>%
   summarize(Temp.sumy1med = mean(Temp.sumy1med, na.rm = T), 
             Temp.spmed = mean(Temp.spmed))
 
-CC.TN = Ruppia.OneBay_CC%>% 
+CC.TN = Ruppia.OneBay_CC %>%  filter(STATION %in% c("CB5.1", "EE.3.1", "EE1.1")) %>% 
   filter(!year %in% c(2020)) %>%
   group_by(year, simnum_OB) %>% 
   summarize(TN.spme = mean(TN.spme, na.rm = T), 
             TP.spme = mean(TP.spme), 
             Chla.spme = mean(Chla.spme), 
             Sal.spme = mean(Sal.spme))
-WIP.TN = Ruppia.OneBay_WIP%>% 
+WIP.TN = Ruppia.OneBay_WIP %>% filter(STATION %in% c("CB5.1", "EE.3.1", "EE1.1"))%>% 
   filter(!year %in% c(2020)) %>%
   group_by(year, simnum_OB) %>% 
   summarize(TN.spme = mean(TN.spme, na.rm = T), 
@@ -441,7 +445,7 @@ Chla.Change =
 Chla.Change
 
 Sal.Change = 
-  ggplot(data = CC.TN) + 
+  ggplot(data = CC.TN ) + 
   geom_line(aes(x = year, y = Sal.spme, group = simnum_OB), alpha = .3, color = "darkorchid") +
   geom_line(data = WIP.TN, aes(x = year, y =Sal.spme, group = simnum_OB), alpha = .3, color = "cyan2") +
   stat_summary(aes(x = year, y = Sal.spme), geom = "line", 
@@ -714,8 +718,8 @@ F_WIP.PredOneTrueBae %>% #filter(STATION == "CB1.1") %>%
   geom_line(aes(x = year, y = Area, group = simnum_OB))
 
 #Proportion time####
-pastA = allcomm_past.df %>% group_by(year) %>% summarize(A = sum(Area.total))
-past_Prop = allcomm_past.df %>% group_by(year, SpCluster) %>% 
+pastA = allcomm_pastSAVWQ85.df %>% group_by(year) %>% summarize(A = sum(Area.total))
+past_Prop = allcomm_pastSAVWQ85.df %>% group_by(year, SpCluster) %>% 
   summarize(Prop = Area.total/pastA$A)
 #futA = allcomm_WIP.wl.dfONE %>% group_by(year, simnum_OB) %>% summarize(A = sum(Area.total))
 
@@ -731,7 +735,7 @@ ggplot(data = past_Prop) +
   labs(y = "Proportion of Bay", x = "") +
   theme_bw(base_size=24) + 
   scale_x_continuous(breaks=seq(1980, 2070, 10)) +
- # scale_color_manual(values = colorme) +
+  scale_color_manual(values = colorme) +
   theme(plot.margin = unit(c(.3, 1, .3, 1.5), "cm"), 
         panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "")
 
@@ -797,7 +801,7 @@ NutRed_Allcomm.Area =
           panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "")
 NutRed_Allcomm.Area
 
-aniNut= 
+#aniNut= 
   ggplot(data = allcomm_WIP.wl.dfONE) + 
   stat_summary(data = allcomm_WIP.wl.dfONE, 
                aes(x = year, y = Area.total, color = SpCluster), 
