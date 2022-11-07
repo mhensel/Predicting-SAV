@@ -173,8 +173,8 @@ View(CBPnas)
 
 #visualize one
 ggplot(data = CBPall %>% filter(STATION == "CB5.1")) + 
-  stat_summary(aes(x = date, y = Temp, color = Temp), fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), size = .4) +
-  stat_summary(aes(x = date, y = Temp), fun.data = mean_se, geom = "line", fun.args = list(mult = 1), size = .6, color = "black") +
+  stat_summary(aes(x = date, y = Temp, color = Temp), geom = "pointrange", fun.data = "mean_se", size = .8) +
+  stat_summary(aes(x = date, y = Temp, color = Temp), fun.data = "mean_se", geom = "smooth", method = "lm", size = 1) +
   scale_color_gradient(low="blue", high="red") +
   #ylim(10,25) +
   ylab("Temperature (daily C)") + 
@@ -451,7 +451,7 @@ CBP.WQ_grow <- CBPall %>%
          Sal.growy1med = lag(Sal.growmed), Chla.growy1med = lag(Sal.growmed), 
          Secc.growy1med = lag(Secc.growmed)) %>% ungroup()
 
-#CBP.WQ_combined####
+#CBP.WQ_combined, THE MASTER!!!!####
 #Depends on how you want to do this but we have CBP.WQ_summer, CBP.WQ_spring, and CBP.WQ_yearly
 #
 CBP.WQ_combined = full_join(CBP.WQ_yearly, CBP.WQ_spring) %>% full_join(CBP.WQ_summer) %>%
@@ -467,7 +467,9 @@ vroom_write(CBP.WQ_combined, "/Volumes/savshare2/Current Projects/Predicting-SAV
 vroom_write(CBP.WQ_combined, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_combined.csv")
 
 #CBP.WQ_forPredictions######
+#This is the best dataset on this page, but using AllClean from assemble climate data.R is the best one. Filtered correctly and uses 2000-2020 data 
 #Specifically select only the ones we need for the projections
+#this df is used in communityDFs.R to build the SAVCommDensWQ_forPredictions
 CBP.WQ_forPredictions = CBP.WQ_combined %>% 
   select(year, STATION, Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, 
          Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summed, Temp.summax, 
@@ -475,9 +477,22 @@ CBP.WQ_forPredictions = CBP.WQ_combined %>%
          Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, 
          TP.summe, TP.summax, TN.spme, TN.spmed, TN.summe)
 
-vroom_write(CBP.WQ_forPredictions, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
+vroom_write(CBP.WQ_forPredictions, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv") #Spring is May here, but watch for the issues from 2020 covid missing data 
 vroom_write(CBP.WQ_forPredictions, "~/Documents/R projects/Predicting-SAV/data/CBP.WQ_forPredictions.csv")
   
+CBP.WQ_forPredictionsGROW = CBP.WQ_combined %>% 
+  select(year, STATION, Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, 
+         Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summed, Temp.summax, 
+         Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Sal.summed, 
+         Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, 
+         TP.summe, TP.summax, TN.spme, TN.spmed, TN.summe, 
+         Temp.growy1med, Temp.growy1me, Sal.growmax, Sal.growy1max, 
+         Temp.growmed, Temp.growme, Temp.growmin, Temp.growme, Temp.growmed, Temp.growmax, 
+         Chla.growme, Chla.growme, Sal.growmed, Sal.growme, Sal.growme, Sal.growmed, 
+         Secc.growme, Secc.growme, TP.growmed, TP.growme, TSS.growme, 
+         TP.growme, TP.growmax, TN.growme, TN.growmed, TN.growme)
+
+#Not worth using 69 anymore#####
 
 #69 Variables Changed seasons####
 #NOTE: Growing season is to august, and spring is till june in this!!!1

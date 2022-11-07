@@ -13,7 +13,7 @@ install_github("jslefche/piecewiseSEM@devel")
 #After this, unsure. I would like: non logged SEM, GAM, lm, etc. but the "test" ones mostly
 
 ####UPDATED: 1/21/22####
-#We have the new, better DF for each Community here: 
+#We have the new, better DF for each Community here: comes from tidyCBPWQ_2020.R
 
 SAVCommDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
 

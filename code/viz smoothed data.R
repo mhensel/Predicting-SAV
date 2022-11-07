@@ -60,6 +60,10 @@ dwm.to.HA_F = lm(SAVArea ~ dens.weight.mean, data = SAVCommDensWQ_ForPred %>%
                    filter(SpCluster == "Fresh"))
 
 
+HA_Zo = lm(dens.weight.mean ~ SAVArea , data = SAVCommDensWQ_ForPred %>% 
+                    filter(SpCluster == "Zostera"))
+predict(HA_Zo, newdata = 74000)
+
 #testing out the new DFs to see if they diff (they are)####
 #CBPall vs CBPall_DETREND
 
@@ -315,53 +319,6 @@ qplot(data = allcomm_pastSAVWQ85.df, x = year, y = TN.summe, geom = "smooth") +
   stat_summary(aes(x = year, y = TN.summe), geom = "pointrange", fun.data = "mean_se")
 
 #Build Figures of Interest####
-
-#Figures to show OneBay Scenario effects on Env Vars####
-CC.temp = Zostera.OneBay_CC %>% 
-  filter(!year %in% c(2020)) %>%
-  group_by(year, simnum_OB) %>% 
-  summarize(Temp.sumy1med = mean(Temp.sumy1med, na.rm = T), 
-            Temp.spmed = mean(Temp.spmed))
-WIP.temp = Zostera.OneBay_WIP %>% 
-  filter(!year %in% c(2020)) %>%
-  group_by(year, simnum_OB) %>% 
-  summarize(Temp.sumy1med = mean(Temp.sumy1med, na.rm = T), 
-            Temp.spmed = mean(Temp.spmed))
-
-CC.TN = Ruppia.OneBay_CC %>%  filter(STATION %in% c("CB5.1", "EE.3.1", "EE1.1")) %>% 
-  filter(!year %in% c(2020)) %>%
-  group_by(year, simnum_OB) %>% 
-  summarize(TN.spme = mean(TN.spme, na.rm = T), 
-            TP.spme = mean(TP.spme), 
-            Chla.spme = mean(Chla.spme), 
-            Sal.spme = mean(Sal.spme))
-WIP.TN = Ruppia.OneBay_WIP %>% filter(STATION %in% c("CB5.1", "EE.3.1", "EE1.1"))%>% 
-  filter(!year %in% c(2020)) %>%
-  group_by(year, simnum_OB) %>% 
-  summarize(TN.spme = mean(TN.spme, na.rm = T), 
-            TP.spme = mean(TP.spme), 
-            Chla.spme = mean(Chla.spme), 
-            Sal.spme = mean(Sal.spme))
-
-Temp.Change = 
-  ggplot(data = CC.temp) + 
-  geom_line(aes(x = year, y = Temp.sumy1med, group = simnum_OB), alpha = .3, color = "darkorchid") +
-  stat_summary(aes(x = year, y = Temp.sumy1med), geom = "line", 
-               size = 3, color = "black") +
-  stat_summary(data = SAVWQallClean %>% filter(SpCluster == "Zostera") %>% group_by(year) %>% 
-                 summarize(Temp = mean(Temp.sumy1med, na.rm = T)),
-               aes(x = year, y = Temp), geom = "line", 
-               size = 3, color = "brown") +
-  geom_smooth(data = SAVWQallClean %>% filter(SpCluster == "Zostera") %>% group_by(year) %>% 
-                summarize(Temp = mean(Temp.sumy1med, na.rm = T)), 
-              method = "lm",
-              aes(x = year, y = Temp), alpha = .3, color = "black") +
-  theme_bw(base_size=34) + 
-  labs(y = expression(paste("Low Bay Summer Temp (mean", degree ~ C, ")")), x = "") +
-  scale_x_continuous(breaks=seq(1980, 2070, 10)) +
-  theme(plot.margin = unit(c(.25, 1, .25, 1), "cm"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "right")
-Temp.Change
-
 
 TN.Change = 
   ggplot(data = CC.TN) + 

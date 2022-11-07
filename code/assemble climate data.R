@@ -238,65 +238,24 @@ WIPwocb1.1TN = WIP.woland_2031_2060 %>% filter(Station == "CB1.1") #%>% select(D
 #write_csv(WIP.woland_2031_2060, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/WIP.woland_2031_2060.csv")
 #write_csv(baseline, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/baseline.csv")
 
-#READ THIS, about workflow change####
+#START HERE AND READ THIS, about workflow change####
 #Major change in the workflow where we dont do the summarizing right away. Follow this workflow now:
 #CC.wland_2021_2060 (created already, above) and baseline_Dprep (created below) get daily matched up to create CC.wland_D, which are daily differences in the baseline and the future (i.e., June 11 2028 - June 11 1990 = one possible future scalar. June 11 2040 - June 11 1993 is also a possible scalar). [NOTE: 4/20/22 I cant remember exactly why we do this. Why not just match by month?] This creates CC.wland_ProjPrep which then is CC.wland_summerPP and springPP. Still PP (ProjPrep) because these are still DAILY. Very Important change!
 #April 2022 update: Detrending past data and smoothing future data occurs too.
 #4/20/22 update: We may need to ditch the DM matchup because we have a new problem where neighboring stations are having data selected from different years. this creates a big averaging problem doesnt it??
 #5/4/22 Update: Needed to fix all of the NAs in the CBPall dataset. We also change to pull past data only from 2000-2020. And there is a new nest_by() in the climate projections code so we make sure that neighboring stations arent pulling from different past years! 
+#6/30/22 Update: New issues with the output not being variable enough, plus bad predictions. May need to start from scratch.... 
+#8/2/22 Update: Moving to using DETREND84, instead of DETREND. checking everything through. Might revert to not using DETREND. SMOO needs to be used though. 
 
-####Build NA-less SAVCommDens and twentyone w####
-#Load in the SAV change per year data, merged with CBP WQ data, with the 69 variables of interest selected:
+#SAVCommDensWQ_ForPred####
+SAVCommDensWQ_ForPred =vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv")
+SAVCommDensWQ_ForPred.with0s = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.with0s.csv")
 
+#CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
 
-SAVCommDensWQ_fP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_forPredictions.csv")
-
-SAVCommDensWQ_fP_MEDIANS = SAVCommDensWQ_fP %>% 
-  filter(between(year, 1999, 2020)) %>% 
-  group_by(STATION) %>%
-  summarize(across(Temp.sumy1med:TN.summe, ~median(., na.rm = T), .names = "{.col}_med"))
-
-#We deal with 0s by eliminating any years where the 3 previous years were 0s, with this antijoin code
-SAVCommZeros = SAVCommDensWQ_fP %>%
-  mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1))  %>%
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
-#anti join the 0s to get a No0 df
-
-SAVCommDensWQ_ForPred = anti_join(SAVCommDensWQ_fP, SAVCommZeros) %>% #anti the 0s
-  full_join(SAVCommDensWQ_fP_MEDIANS) %>% #fill in NAs with medians
-  group_by(STATION) %>%
-  mutate(Temp.sumy1med = coalesce(Temp.sumy1med, Temp.sumy1med_med), 
-         Temp.sumy1me = coalesce(Temp.sumy1me, Temp.sumy1me_med),
-         Temp.summe = coalesce(Temp.summe, Temp.summe_med),
-         Temp.summed = coalesce(Temp.summed, Temp.summed_med),
-         Temp.summin = coalesce(Temp.summin, Temp.summin_med),
-         Temp.spme = coalesce(Temp.spme, Temp.spme_med),
-         Temp.spmed = coalesce(Temp.spmed, Temp.spmed_med),
-         Sal.summe = coalesce(Sal.summe, Sal.summe_med),
-         Sal.summax = coalesce(Sal.summax, Sal.summax_med),
-         Sal.summed = coalesce(Sal.summed, Sal.summed_med),
-         Sal.spme = coalesce(Sal.spme, Sal.spme_med),
-         Sal.sumy1max = coalesce(Sal.sumy1max, Sal.sumy1max_med),
-         Secc.summe = coalesce(Secc.summe, Secc.summe_med),
-         Chla.spme = coalesce(Chla.spme, Chla.spme_med),
-         Chla.summe = coalesce(Chla.summe, Chla.summe_med),
-         TN.spme = coalesce(TN.spme, TN.spme_med),
-         TN.summe = coalesce(TN.summe, TN.summe_med),
-         TP.spme = coalesce(TP.spme, TP.spme_med),
-         TP.summe = coalesce(TP.summe, TP.summe_med)) %>%
-  select(STATION, year, SpCluster, 
-         dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, 
-         dens.percomp.change, denscomp.max, SAVArea, 
-         Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, Temp.spmed, Temp.spme, 
-         Temp.summin, Temp.summe, Temp.summed, Temp.summax, Chla.spme, Chla.summe, 
-         Sal.summed, Sal.spme, Sal.summe,  Secc.summe, TP.spme, TP.summe, TN.spme, TN.summe) 
-
-vroom_write(SAVCommDensWQ_ForPred, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_semForPredictions.csv")
-
-CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
-
-twentyone = CBP.WQ_forPredictions %>%  #twentyone should work for all Communities
-  filter(year %in% c("2020", "2019", "2018", "2017")) %>%
+#need a DF that has "y1" data for the start year of 2020. So we are making up a dataset for 2021.
+twentyone = SAVCommDensWQ_ForPred %>%  #twentyone should work for all Communities
+  filter(year %in% c("2020", "2019", "2018", "2017", "2007")) %>% #2007 bc some of the NAs are bc no data for a while
   select(STATION, year, Temp.summed, Temp.summe, Sal.summax) %>% #im just selecting the ones we need
   group_by(STATION) %>%
   summarize(across(Temp.summed:Sal.summax, ~mean(., na.rm = T))) %>%
@@ -304,14 +263,14 @@ twentyone = CBP.WQ_forPredictions %>%  #twentyone should work for all Communitie
   rename(Temp.sumy1med = Temp.summed, Temp.sumy1me = Temp.summe, Sal.sumy1max = Sal.summax) %>%
   rename(Station = STATION, Year = year) %>%
   select(Station, Year, everything()) %>% 
-  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #LE5.5 doenst have temp, TFs and RET5.1A dont have salinities
+  #replace_na(list(Temp.sumy1me = 27.04, Temp.sumy1med = 26.34, Sal.sumy1max = 7.940)) %>% #Xhh is messed up
   ungroup() 
+#vroom_write(twentyone, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/twentyone.csv")
 
-
-#"no climate change" scenario ####
+#Create DETREND Dataset here, ####
 #This is assuming that 2021-2060 will just basically be randomly drawn from the past data that we have from CBP 1984-2020. future projections from real CBP Data, randomly drawn as NO CC#
 #NOTE: 1984-1987 have NAs that could cause problems. Also, spring 2020 data is incomplete because of covid
-
+#start w raw CBPall (is this risky????)
 CBPall = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_2020.csv") #%>% 
   #mutate(STATION = recode(STATION, "LE5.5" = "LE5.5-W")) #LE5.5 ceased to exist, and no SAV
 
@@ -319,6 +278,7 @@ FutureYears = as_tibble(seq(from = 2021, to = 2060, by = 1)) %>% rename("Year" =
 CBPstations = unique(CBPall$STATION) #we use this now, although we should probably make sure that this is only from the stations that actually have SAV
 
 #Edited workflow to fix incomplete years by station issue####
+#NOTE: this is a different median replace method than we did for SAVCommDensWQ_ForPred. Why? I dont really know but I guess it's because the CBPall data matches up with the CC.wl data better that way
 #build this DF of empty rows but its the "complete" set of years and months
 CBPYears = as_tibble(seq(from = 2000, to = 2020, by = 1)) %>% #Note, not 2019 but 2020
   rename("year" = "value") %>% 
@@ -347,48 +307,57 @@ CBPall_missingmo = anti_join(CBPYears, CBPall_Future, by = c("year", "month", "S
 
 CBPall_allmo = full_join(CBPall_Future, CBPall_missingmo) 
 
-#monthly medians
+
+
+#monthly medians for all stations
 CBPall_MEDIANS = CBPall_Future %>% 
  # group_by(Station, month) %>% 
  # mutate(date_med = median(as.Date(date))) %>% #janky creation of fake date for DM matchup later
  # mutate(DM_med = format(as.Date(date_med), "%m-%d")) %>%
   group_by(Station, month) %>%
   summarize(across(TN:Chla, ~median(., na.rm = T), .names = "{.col}_med")) %>%
-  select(Station, month, TN_med:Chla_med) %>% ungroup() %>%
+  select(Station, month, TN_med:Chla_med) %>% ungroup() %>% #dude...just stop here??
   full_join(CBPYears) %>% #and now fill in missing months
   group_by(Station) %>% 
   mutate(across(TN_med:Chla_med, ~median(., na.rm = T), .names = "{.col}_Y")) %>% 
   ungroup() %>%
   group_by(Station, month) %>%
   mutate(Temp_med = coalesce(Temp_med, Temp_med_Y), Sal_med = coalesce(Sal_med, Sal_med_Y), Secc_med = coalesce(Secc_med, Secc_med_Y), 
-         Chla_med = coalesce(Chla_med, Chla_med_Y), TN_med = coalesce(TN_med, TN_med_Y), TP_med = coalesce(TP_med, TP_med_Y)) %>%
+         Chla_med = coalesce(Chla_med, Chla_med_Y), TN_med = coalesce(TN_med, TN_med_Y), TP_med = coalesce(TP_med, TP_med_Y)) %>% #i cant remember why we need this one too? 
   group_by(Station, month) %>%
   mutate(year = seq(from = 2000, to = 2020, by = 1)) %>%
   mutate(day = 20) %>% 
   mutate(date = make_date(year, month, day)) %>%
   mutate(DM = format(as.Date(date), "%m-%d")) %>% 
   group_by(Station, month, DM, year) %>% 
-  summarize(across(TN_med:Chla_med, ~mean(., na.rm = T)) )
+  summarize(across(TN_med:Chla_med, ~mean(., na.rm = T)) ) #not sure why we need this last line either but im moving on
 
 #View(CBPall_MEDIANS %>% group_by(Station) %>% summarize(length(month)))
 
-#complete CBPall from 2000-2020#####
-#should write this, bc its actually complete for the first time ever
+#View(CBPall_0020 %>% group_by(Station, month) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))))
+#complete CBPall from 2000-2020, monthly median replaced #####
+
 CBPall_0020 = full_join(CBPall_allmo, 
                         CBPall_MEDIANS, by = c("Station", "month", "year")) %>%
 #  group_by(Station, month) %>%
   mutate(DM = coalesce(DM.x, DM.y), Temp = coalesce(Temp, Temp_med), Sal = coalesce(Sal, Sal_med), Secc = coalesce(Secc, Secc_med), 
          Chla = coalesce(Chla, Chla_med), TN = coalesce(TN, TN_med), TP = coalesce(TP, TP_med)) %>%
  # ungroup() %>% 
-  select(Station, DM, year, month, TN:Chla) 
+  select(Station, DM, year, month, TN:Chla) %>%
+  arrange(Station, year, month, DM)
 
 
 #vroom_write(CBPall_0020, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_0020.csv")
 
-#ggplot(data = CBPall_0020 %>% filter(str_detect(Station, "^TF"))) + 
-#  stat_summary(aes(x = year, y = TN, group = Station, color = Station), geom = "line", fun.data = "mean_cl_boot")
-#
+ggplot(data = CBPall_0020 %>% filter(str_detect(Station, "^TF"))) + 
+  stat_smooth(aes(x = year, y = TN, group = Station, color = Station), method = "lm") +
+  facet_wrap(~Station, scales = "free_y")
+
 #CBPall_F is the yearly mean so that we can get the trend in the means... 
+
+#STOP!!!!!! 
+#Do we really need to detrend the data from just the last 20 years? I dont think so! 
 
 CBPall_F = CBPall_0020 %>% #these are yearly means
  # rename("Station" = "STATION") %>% #rename to match w projction data
@@ -432,7 +401,7 @@ CBPall_DETREND = CBPall_F %>%
          detreSecc = (Secc - predSecc) + Seccend, 
          detreChla = (Chla - predChla) + Chlaend, 
          detreTN = (TN - predTN) + TNend, 
-         detreTP = (TP - predTP) + TPend) %>%
+         detreTP = (TP - predTP) + TPend) %>% 
   mutate(across(detreSal:detreTP, ~case_when(.x < 0 ~ 0.01, TRUE ~ .x))) %>%  #get rid of neg val detrends
   select(Station, year, month, DM, detreTemp:detreTP)
 
@@ -440,9 +409,146 @@ CBPall_DETREND = CBPall_F %>%
 #Detrend written here####
 #the detrend data comes up a bit so lets just write it
 #vroom_write(CBPall_DETREND, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_DETREND.csv")
+#CBPall_DETREND = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_DETREND.csv")
 
-CBPall_DETREND = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_DETREND.csv")
 
+##DETREND full dataset 1984-2020####
+CBPYears84 = as_tibble(seq(from = 1984, to = 2020, by = 1)) %>% #Note, not 2019 but 2020
+  rename("year" = "value") %>% 
+  group_by(year) %>%
+  summarise(month = seq(from = 1, to = 12, by = 1)) %>%
+  group_by(year, month) %>%
+  # summarise(day = seq(from = 1, to = 31, by = 1)) %>%
+  # group_by(year, month, day) %>%
+  summarize(Station = CBPstations, Temp = NA, Sal = NA, Secc = NA, Chla = NA, TN = NA, TP = NA)
+
+CBPall_Future84 = CBPall  %>%
+ # filter(year > 1999) %>% Only difference from all_Future
+  rename("Station" = "STATION") %>% #rename to match w projction data
+  select(Station:Chla) %>% #we dont need the .D variables
+  # drop_na() %>% #drops 20,000 points #new median method 5/3/22... maybe dont do this? 
+  group_by(Station, year) %>% #
+  mutate(day = day(date)) %>%
+  mutate(DM = format(as.Date(date), "%m-%d")) %>%
+  mutate(date = as.Date(date)) %>%
+  select(Station, date, DM, year, month, day, TN:Chla) %>%
+  select(-TSS)
+
+#DF of every missing month of data for every station. We will replace these with medians
+CBPall_missingmo84 = anti_join(CBPYears84, CBPall_Future84, by = c("year", "month", "Station"))
+
+CBPall_allmo84 = full_join(CBPall_Future84, CBPall_missingmo84) 
+
+#monthly medians for all stations
+CBPall_MEDIANS84 = CBPall_Future84 %>% 
+  # group_by(Station, month) %>% 
+  # mutate(date_med = median(as.Date(date))) %>% #janky creation of fake date for DM matchup later
+  # mutate(DM_med = format(as.Date(date_med), "%m-%d")) %>%
+  group_by(Station, month) %>%
+  summarize(across(TN:Chla, ~median(., na.rm = T), .names = "{.col}_med")) %>%
+  select(Station, month, TN_med:Chla_med) %>% ungroup() %>%
+  full_join(CBPYears84) %>% #and now fill in missing months
+  group_by(Station) %>% 
+  mutate(across(TN_med:Chla_med, ~median(., na.rm = T), .names = "{.col}_Y")) %>% 
+  ungroup() %>%
+  group_by(Station, month) %>%
+  mutate(Temp_med = coalesce(Temp_med, Temp_med_Y), Sal_med = coalesce(Sal_med, Sal_med_Y), Secc_med = coalesce(Secc_med, Secc_med_Y), 
+         Chla_med = coalesce(Chla_med, Chla_med_Y), TN_med = coalesce(TN_med, TN_med_Y), TP_med = coalesce(TP_med, TP_med_Y)) %>%
+  group_by(Station, month) %>%
+  mutate(year = seq(from = 1984, to = 2020, by = 1)) %>%
+  mutate(day = 20) %>% 
+  mutate(date = make_date(year, month, day)) %>%
+  mutate(DM = format(as.Date(date), "%m-%d")) %>% 
+  group_by(Station, month, DM, year) %>% 
+  summarize(across(TN_med:Chla_med, ~mean(., na.rm = T)) )
+
+#View(CBPall_MEDIANS %>% group_by(Station) %>% summarize(length(month)))
+
+#CBPall_8420 median replaced NAs####
+#should write this, bc its actually complete for the first time ever
+CBPall_8420 = full_join(CBPall_allmo84, 
+                        CBPall_MEDIANS84, by = c("Station", "month", "year")) %>%
+  #  group_by(Station, month) %>%
+  mutate(DM = coalesce(DM.x, DM.y), Temp = coalesce(Temp, Temp_med), Sal = coalesce(Sal, Sal_med), Secc = coalesce(Secc, Secc_med), 
+         Chla = coalesce(Chla, Chla_med), TN = coalesce(TN, TN_med), TP = coalesce(TP, TP_med)) %>%
+  # ungroup() %>% 
+  select(Station, DM, year, month, TN:Chla) %>%
+  arrange(Station, year, month, DM)
+
+#vroom_write(CBPall_8420, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_8420.csv")
+
+#CBPall_8420 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_8420.csv")
+
+CBPall_F84 = CBPall_8420 %>% #these are yearly means
+  group_by(Station, year) %>%
+  summarize(across(TN:Chla, ~mean(.x, na.rm = T))) %>% 
+  drop_na()
+
+#Create CBPall_DETREND84###
+CBPall_DETREND84 = CBPall_F84 %>% 
+  filter(between(year,2010,2020)) %>% 
+  group_by(Station) %>%
+  summarize(across(TN:Chla, ~((mean(.))), na.rm = T, .names = "{.col}end")) %>% #get mean of last decade, call that variable Tempend
+  full_join(CBPall_F84) %>% #bring that summarized 2010-2020 data back into the DF for nesting
+  ungroup() %>%
+  nest_by(Station) %>%
+  mutate(Tempmod = list(lm(Temp ~ year, data = data)), #a model of Temp over time by year
+         Salmod = list(lm(Sal ~ year, data = data)), 
+         Seccmod = list(lm(Secc ~ year, data = data)), 
+         Chlamod = list(lm(Chla ~ year, data = data)), 
+         TNmod = list(lm(TN ~ year, data = data)), 
+         TPmod = list(lm(TP ~ year, data = data))) %>% 
+  mutate(predTemp = list(predict(Tempmod, data)), #predicted Temp over time by year
+         predSal = list(predict(Salmod, data)), 
+         predSecc = list(predict(Seccmod, data)), 
+         predChla = list(predict(Chlamod, data)), 
+         predTN = list(predict(TNmod, data)), 
+         predTP = list(predict(TPmod, data))) %>% 
+  unnest(cols = c(data, predTemp, predSal, predSecc, predChla, predTN, predTP)) %>% 
+  select(-c(Temp, Sal, Secc, Chla, TN, TP, Tempmod, Salmod, Seccmod, Chlamod, TNmod, TPmod)) %>%
+  full_join(CBPall_8420, by = c("Station", "year")) %>% #join these predicteds into the full CBPall. This used to be CBPall_Future but inserting the compelte data set now 
+  #  filter(str_detect(Station, "^CB4")) %>% 
+  mutate(detreTemp = (Temp - predTemp) + Tempend, #Voila! detrended Temp = (Actual Observed Temp - Predicted temp) + Last decades mean Temp
+         detreSal = (Sal - predSal) + Salend, 
+         detreSecc = (Secc - predSecc) + Seccend, 
+         detreChla = (Chla - predChla) + Chlaend, 
+         detreTN = (TN - predTN) + TNend, 
+         detreTP = (TP - predTP) + TPend) %>% 
+  mutate(across(detreSal:detreTP, ~case_when(.x < 0 ~ 0.01, TRUE ~ .x))) %>%  #get rid of neg val detrends
+  select(Station, year, month, DM, detreTemp:detreTP, TN:Chla) #just added these last 2 bc i wanted to see
+
+#Detrend84 written here####
+#vroom_write(CBPall_DETREND84, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_DETREND84.csv")
+#8/2/22 = Using DETREND84 now and seeing how it works
+CBPall_DETREND84 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_DETREND84.csv")
+
+#If we usin the 84 data, detrend might be good. but using the 0020 data we realy dont need to do it I dont think. 
+#detrevsorig = ####
+#Graph to look at each of the Detrends. I dont think we really need to do it!
+ggplot(data = CBPall_DETREND84 %>% filter(str_detect(Station, "^TF"))) +
+  stat_summary(aes(x = year, y = detreTN), geom = "point", color = "black", fun.data = "mean_se", size = 1) +
+  stat_summary(aes(x = year, y = TN), data = CBPall_0020 %>% filter(str_detect(Station, "^TF")), color = "blue", geom = "point", fun.data = "mean_se", size = 1.2) + #compare to all 
+  stat_summary(aes(x = year, y = TN), data = CBPall_8420 %>% filter(str_detect(Station, "^TF")), color = "green", geom = "point", fun.data = "mean_se", size = .7) + 
+  stat_summary(aes(x = year, y = detreTN), geom = "line", color = "black", fun.data = "mean_se", size = 1) +
+  stat_summary(aes(x = year, y = TN), data = CBPall_0020 %>% filter(str_detect(Station, "^TF")), color = "blue", geom = "line", fun.data = "mean_se", size = 1.2) + #compare to all 
+  stat_summary(aes(x = year, y = TN), data = CBPall_8420 %>% filter(str_detect(Station, "^TF")), color = "green", geom = "line", fun.data = "mean_se", size = .7) + 
+  stat_summary(aes(x = year, y = TN), data = CBPall %>% filter(str_detect(STATION, "^TF")) %>% rename(Station = STATION), shape = 11,color = "darkslategrey", geom = "point", fun.data = "mean_se", size = 1.4) + 
+  stat_summary(aes(x = year, y = TN), data = CBPall %>% filter(str_detect(STATION, "^TF")) %>% rename(Station = STATION), color = "darkslategrey", geom = "line", fun.data = "mean_se", size = 1.2) +
+  facet_wrap(~Station, scales = "free_y")
+
+
+
+ggplot(data = CBPall_DETREND84 %>% filter(str_detect(Station, "^CB"))) +
+  stat_summary(aes(x = year, y = detreTemp), geom = "point", color = "green", fun.data = "mean_se") +
+  stat_summary(aes(x = year, y = Temp, group = Station), data = CBPall %>% filter(str_detect(STATION, "^CB")) %>% rename(Station = STATION) %>% filter(!year == "1984"), fun.data = "mean_se", color = "black", size = 1.2, geom = "line") +
+  stat_summary(aes(x = year, y = Temp), data = CBPall_8420 %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", color = "blue", geom = "point") + #compare to all 
+#stat_summary(data = CBPall_DETREND %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", aes(x = year, y = detreTemp), geom = "point", color = "orange") +
+#  stat_summary(aes(x = year, y = Temp), data = CBPall_0020 %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", color = "pink", geom = "point") + 
+  stat_summary(aes(x = year, y = detreTemp), geom = "line", color = "green", fun.data = "mean_se") +
+  stat_summary(aes(x = year, y = Temp), data = CBPall_8420 %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", color = "blue", geom = "line") + #compare to all 
+ # stat_summary(data = CBPall_DETREND %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", aes(x = year, y = detreTemp), geom = "line", color = "orange") +
+ # stat_summary(aes(x = year, y = Temp), data = CBPall_0020 %>% filter(str_detect(Station, "^CB")), fun.data = "mean_se", color = "pink", geom = "line") + 
+  facet_wrap(~Station, scales = "free_y")
 
 
 
@@ -450,6 +556,8 @@ CBPall_DETREND = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/
 
 #View(CBPall_Future %>% group_by(Station) %>% summarize(unique(year)))
 #CBPall %>% filter(STATION == "EE3.1" & year == 1997) %>% select(month, Temp)
+
+#Bring in Baseline, CC.wland, WIP.wland####
 
 CC.wland_2021_2060 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/climate modelling data/CC.wland_2021_2060.csv") %>%
   mutate(Date = make_date(year = Year, month = Month, day = Day))
@@ -509,6 +617,7 @@ CC_D.yrme = CC.wland_D %>%
   group_by(Station, year) %>%
   summarize(across(Temp:TP, ~mean(.x, na.rm = T))) #mean delta per year per station here
 
+#Smooth: take the final decade and move the trend so it goes from start (2021) to end (2060)
 CC.meanyearSMOO = CC_D.yrme %>% 
   filter(between(year,2051,2060)) %>% #final decade only
   mutate(across(Temp:TP, ~((mean(.)/40)), na.rm = T, .names = "{.col}m")) %>% #30 years not 40, calc mean of the final decade
@@ -534,35 +643,39 @@ CC.meanyearSMOO = CC_D.yrme %>%
   full_join(CC.wland_D %>% 
               mutate(day = day(Date), month = month(Date), year = year(Date)) %>%
               mutate(DM = format(as.Date(Date), "%m-%d")), by = c("Station", "year")) %>% 
-  mutate(smoothTemp = Temp - (predTemp - Tempm), 
+  mutate(smoothTemp = Temp - (predTemp - Tempm),  #smoothTemp = the scalar smoothed out! 
          smoothSal = Sal - (predSal - Salm), 
          smoothSecc = Secc - (predSecc - Seccm), 
          smoothChla = Chla - (predChla - Chlam), 
          smoothTN = TN - (predTN - TNm), 
          smoothTP = TP - (predTP - TPm)) %>% 
-  select(Station, year, month, DM, smoothTemp:smoothTP)
+  select(Station, year, month, smoothTemp:smoothTP) %>% 
+  group_by(Station, year, month) %>%
+  summarise(across(smoothTemp:smoothTP, ~mean(.)))
 
 
 
-#combine SMOO and DETREND (formerly _ProjPrep)####
-CC.wl_PP = CC.meanyearSMOO %>% 
-  full_join(CBPall_DETREND, by = c("Station", "DM")) %>% #detre = NoCC data, smooth = delta. So should be .y + .x 
+#combine Future and Past to get Deltas! SMOO and DETREND84 (formerly _ProjPrep)####
+#For
+CC.wl_PP = CC.meanyearSMOO %>% #filter(Station == "CB1.1") %>% 
+  full_join(CBPall_DETREND84 %>% filter(between(year,1990,2020)), #%>% filter(Station == "CB1.1"),
+                                                by = c("Station", "month")) %>% #detre = NoCC data, smooth = delta. So should be .y + .x 
+  #CHECK THE RANDOM SELECTION HERE!!!!! dont be confused that this has Temp:TP those are the non detrended! 
   drop_na() %>% #like 5K points per station over time from unmatched dates
-  group_by(Station, DM) %>%
+  group_by(Station, month) %>%
   mutate(Temp = detreTemp + smoothTemp, #CREATE FUTURE ENV FOR SIMULATIONS HERE!!####
          Sal = detreSal + smoothSal,     #detre(ie detrended past data, e.g. ) + smooth(ie smoothed future scalar) = 
-         Secc = detreSecc + smoothSecc, 
+         Secc = detreSecc + smoothSecc,  #dont
          Chla = detreChla + smoothChla, 
          TN = detreTN + smoothTN, 
          TP = detreTP + smoothTP) %>%
-  select(Station, DM, year.x, year.y, month.x, Temp:TP) %>% 
+  select(Station, month, year.x, year.y, Temp:TP) %>% 
   mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
                                     TRUE ~ .x))) %>% 
   ungroup()  #this is just all of the possible things to pull 40 years worth of data from. 
 
-
 CC.wl_sumPP = CC.wl_PP %>% 
-  filter(dplyr::between(month.x, 5, 8)) %>%
+  filter(dplyr::between(month, 5, 8)) %>%
   group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
   summarize(Chla.summe = mean(Chla, na.rm = T), 
             Chla.summax = max(Chla, na.rm = T),
@@ -581,7 +694,7 @@ CC.wl_sumPP = CC.wl_PP %>%
 ####Summarize Spring 
 #Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
 CC.wl_spPP = CC.wl_PP %>% 
-  filter(dplyr::between(month.x, 3, 6)) %>% #late june isnt spring.... 
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... 69 vars one has 6 as this month FYI
   group_by(Station, year.x, year.y) %>% 
   summarise(Chla.spme = mean(Chla, na.rm = T), 
             Secc.spme = mean(Secc, na.rm = T), 
@@ -600,11 +713,123 @@ CC.wlAllFut_ONEBAY = left_join(CC.wl_sumPP, CC.wl_spPP) %>%
   rename("Year" = "year.x", "Year.ref" = "year.y") #%>% #keeping the year.y because we need the reference years to be the same between stations for each simulation.
   #arrange(Year.ref, Year, Station)
 
-vroom_write(CC.wlAllFut_ONEBAY, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wlAllFutsmoodetre_ONEBAY.csv")
+vroom_write(CC.wlAllFut_ONEBAY, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wlAllFut_ONEBAY.csv")
 
-qplot(x = Year, y = TN.spme, group = Station, color = Station, data = CC.wlAllFut, geom = "point", size = 1, alpha = .2) + 
-  stat_smooth(aes(x = Year, y = TN.spme), method = "gam") +
-  theme(legend.position = "none")
+CC.wland_OneFuture.no2021 = CC.wlAllFut_ONEBAY %>% 
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+#Filter out 
+CC.wland_One2021 = CC.wland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+#CC.wland_OneFuture, actually all futures ;)####
+CC.wland_OneFuture = CC.wland_OneFuture.no2021 %>% #OneFuture is a nisnomer... this is all futures
+  filter(!Year == "2021") %>%
+  bind_rows(CC.wland_One2021) %>% 
+  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #this is only for the XHH station..
+  ungroup() %>%
+  arrange(Station, Year)
+
+vroom_write(CC.wland_OneFuture, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/CC.wland_OneFuture.csv")
+
+
+#View(CC.wlAllFut_ONEBAY %>% group_by(Station) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))))
+
+#CC.wl_PP.NoDetre####
+CC.wl_PP.nodetre = CC.meanyearSMOO %>% #filter(Station == "CB1.1") %>% 
+  full_join(CBPall_8420 %>% filter(between(year,1990,2020)), #%>% filter(Station == "CB1.1"),
+            by = c("Station", "month")) %>% #detre = NoCC data, smooth = delta. So should be .y + .x 
+  #CHECK THE RANDOM SELECTION HERE!!!!! dont be confused that this has Temp:TP those are the non detrended! 
+  drop_na() %>% #like 5K points per station over time from unmatched dates
+  group_by(Station, month) %>%
+  mutate(Temp = Temp + smoothTemp, 
+         Sal = Sal + smoothSal,     #detre(ie detrended past data, e.g. ) + smooth(ie smoothed future scalar) = 
+         Secc = Secc + smoothSecc,  #dont
+         Chla = Chla + smoothChla, 
+         TN = TN + smoothTN, 
+         TP = TP + smoothTP) %>%
+  select(Station, month, year.x, year.y, TN:Chla) %>% 
+  mutate(across(TN:Chla, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup()  #
+
+CC.wl_sumPP.nodetre = CC.wl_PP.nodetre %>% 
+  filter(dplyr::between(month, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+CC.wl_spPP.nodetre = CC.wl_PP.nodetre %>% 
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... 69 vars one has 6 as this month FYI
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+
+####Create CC.wl_AllFut####
+#change this back from ONEBAY if it works.
+CC.wlAllFut_ONEBAY.nodetre = left_join(CC.wl_sumPP.nodetre, CC.wl_spPP.nodetre) %>% 
+  rename("Year" = "year.x", "Year.ref" = "year.y") #%>% #keeping the year.y because we need the reference years to be the same between stations for each simulation.
+#arrange(Year.ref, Year, Station)
+
+vroom_write(CC.wlAllFut_ONEBAY.nodetre, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/CC.wlAllFut_ONEBAY.nodetre.csv")
+
+
+CC.wland_OneFuture.no2021.nodetre = CC.wlAllFut_ONEBAY.nodetre %>% 
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+#Filter out 
+CC.wland_One2021.nodetre = CC.wland_OneFuture.no2021.nodetre %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+#CC.wland_OneFuture, actually all futures ;)####
+CC.wland_OneFuture.nodetre = CC.wland_OneFuture.no2021.nodetre %>% #OneFuture is a nisnomer... this is all futures
+  filter(!Year == "2021") %>%
+  bind_rows(CC.wland_One2021.nodetre) %>% 
+  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #this is only for the XHH station..
+  ungroup() %>%
+  arrange(Station, Year)
+
+vroom_write(CC.wland_OneFuture.nodetre, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/CC.wland_OneFuture.nodetre.csv")
+CC.wland_OneFuture.nodetre = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/CC.wland_OneFuture.nodetre.csv")
+
+ggplot(data = CC.wland_OneFuture %>% filter(str_detect(Station, "^TF"))) +
+  geom_point(aes(x = Year, y = TN.spme, group = Station, color = Station), size = .9) +
+  stat_smooth(aes(x = Year, y = TN.spme, group = Station, color = Station), method = "gam") +
+  facet_wrap(~Station, scales = "free_y") 
+
+ggplot(data = CC.wlAllFut_ONEBAY %>% filter(str_detect(Station, "^CB"))) + 
+  stat_summary(aes(x = Year, y = TN.spme, group = Station), size = .9) +
+  geom_line(aes(x = Year, y = TN.spme, group = Station), size = .9) +
+  stat_smooth(aes(x = Year, y = TN.spme, group = Station), method = "lm") +
+  facet_wrap(~Station)
 
 
 #WIP.wland_D####
@@ -662,13 +887,191 @@ WIP.wl.meanyearSMOO = WIP.wl_D.yrme %>%
          smoothChla = Chla - (predChla - Chlam), 
          smoothTN = TN - (predTN - TNm), 
          smoothTP = TP - (predTP - TPm)) %>% 
-  select(Station, year, month, DM, smoothTemp:smoothTP)
+  select(Station, year, month, smoothTemp:smoothTP) %>% 
+  group_by(Station, year, month) %>%
+  summarise(across(smoothTemp:smoothTP, ~mean(.)))
+
+#combine Future and Past to get Deltas! SMOO and DETREND84 (formerly _ProjPrep)####
+
+WIP.wl_PP = WIP.wl.meanyearSMOO %>% #filter(Station == "CB1.1") %>% 
+  full_join(CBPall_DETREND84 %>% filter(between(year,1990,2020)), #%>% filter(Station == "CB1.1"),
+            by = c("Station", "month")) %>% #detre = NoCC data, smooth = delta. So should be .y + .x 
+  #CHECK THE RANDOM SELECTION HERE!!!!! dont be confused that this has Temp:TP those are the non detrended! 
+  drop_na() %>% #like 5K points per station over time from unmatched dates
+  group_by(Station, month) %>%
+  mutate(Temp = detreTemp + smoothTemp, #CREATE FUTURE ENV FOR SIMULATIONS HERE!!####
+         Sal = detreSal + smoothSal,     #detre(ie detrended past data, e.g. ) + smooth(ie smoothed future scalar) = 
+         Secc = detreSecc + smoothSecc,  #dont
+         Chla = detreChla + smoothChla, 
+         TN = detreTN + smoothTN, 
+         TP = detreTP + smoothTP) %>%
+  select(Station, month, year.x, year.y, Temp:TP) %>% 
+  mutate(across(Temp:TP, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup()  #this is just all of the possible things to pull 40 years worth of data from. 
+
+WIP.wl_sumPP = WIP.wl_PP %>% 
+  filter(dplyr::between(month, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+WIP.wl_spPP = WIP.wl_PP %>% 
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... 69 vars one has 6 as this month FYI
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+
+####Create WIP.wl_AllFut####
+#change this back from ONEBAY if it works.
+WIP.wlAllFut_ONEBAY = left_join(WIP.wl_sumPP, WIP.wl_spPP) %>% 
+  rename("Year" = "year.x", "Year.ref" = "year.y") #%>% #keeping the year.y because we need the reference years to be the same between stations for each simulation.
+#arrange(Year.ref, Year, Station)
+
+write_csv(WIP.wlAllFut_ONEBAY, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wlAllFut_ONEBAY.csv")
+WIP.wlAllFut_ONEBAY = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wlAllFut_ONEBAY.csv")
+
+WIP.wland_OneFuture.no2021 = WIP.wlAllFut_ONEBAY %>% 
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+#Filter out 
+WIP.wland_One2021 = WIP.wland_OneFuture.no2021 %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+#WIP.wland_OneFuture, actually all futures ;)####
+WIP.wland_OneFuture = WIP.wland_OneFuture.no2021 %>% #OneFuture is a nisnomer... this is all futures
+  filter(!Year == "2021") %>%
+  bind_rows(WIP.wland_One2021) %>% 
+  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #this is only for the XHH station..
+  ungroup() %>%
+  arrange(Station, Year)
+
+vroom_write(WIP.wland_OneFuture,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/WIP.wland_OneFuture.csv")
+
+
+#View(WIP.wlAllFut_ONEBAY %>% group_by(Station) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))))
+
+ggplot(data = WIP.wlAllFut_ONEBAY %>% filter(Station %in% c("WT4.1", "CB1.1", "EE3.1", "LE5.5-W"))) +
+  geom_point(aes(x = year, y = dens.weight.mean, group = Station, color = Station), size = .9) +
+  stat_smooth(aes(x = year, y = dens.weight.mean, group = Station, color = Station), method = "lm")
+
+ggplot(data = WIP.wlAllFut_ONEBAY %>% filter(str_detect(Station, "^TF"))) + 
+  stat_smooth(aes(x = Year, y = TP.spme, group = Station, color = Station), method = "lm")
+
+#WIP.wl_PP.NoDetre####
+WIP.wl_PP.nodetre = WIP.wl.meanyearSMOO %>% #filter(Station == "CB1.1") %>% 
+  full_join(CBPall_8420 %>% filter(between(year,1990,2020)), #%>% filter(Station == "CB1.1"),
+            by = c("Station", "month")) %>% #detre = NoWIP data, smooth = delta. So should be .y + .x 
+  #CHECK THE RANDOM SELECTION HERE!!!!! dont be confused that this has Temp:TP those are the non detrended! 
+  drop_na() %>% #like 5K points per station over time from unmatched dates
+  group_by(Station, month) %>%
+  mutate(Temp = Temp + smoothTemp, 
+         Sal = Sal + smoothSal,     #detre(ie detrended past data, e.g. ) + smooth(ie smoothed future scalar) = 
+         Secc = Secc + smoothSecc,  #dont
+         Chla = Chla + smoothChla, 
+         TN = TN + smoothTN, 
+         TP = TP + smoothTP) %>%
+  select(Station, month, year.x, year.y, TN:Chla) %>% 
+  mutate(across(TN:Chla, ~case_when(.x < 0 ~ 0.01, #get rid of negative values that came about from the delta math
+                                    TRUE ~ .x))) %>% 
+  ungroup()  #
+
+WIP.wl_sumPP.nodetre = WIP.wl_PP.nodetre %>% 
+  filter(dplyr::between(month, 5, 8)) %>%
+  group_by(Station, year.x, year.y) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.summe = mean(Chla, na.rm = T), 
+            Chla.summax = max(Chla, na.rm = T),
+            Secc.summe = mean(Secc, na.rm = T), 
+            Secc.summed = median(Secc, na.rm = T), 
+            Sal.summed = median(Sal, na.rm = T), 
+            Sal.summax = max(Sal, na.rm = T),
+            Sal.summe = mean(Sal, na.rm = T), 
+            Temp.summin = min(Temp, na.rm = T), 
+            Temp.summax = max(Temp, na.rm = T),
+            Temp.summe = mean(Temp, na.rm = T), 
+            Temp.summed = median(Temp, na.rm = T),
+            TP.summe = mean(TP, na.rm = T), 
+            TN.summe = mean(TN, na.rm = T)) %>% 
+  ungroup() 
+####Summarize Spring 
+#Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
+WIP.wl_spPP.nodetre = WIP.wl_PP.nodetre %>% 
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... 69 vars one has 6 as this month FYI
+  group_by(Station, year.x, year.y) %>% 
+  summarise(Chla.spme = mean(Chla, na.rm = T), 
+            Secc.spme = mean(Secc, na.rm = T), 
+            Sal.spme = mean(Sal, na.rm = T), 
+            Temp.spme = mean(Temp, na.rm = T), 
+            Temp.spmed = median(Temp, na.rm = T),
+            TP.spme = mean(TP, na.rm = T), 
+            TP.spmed = median(TP, na.rm = T), 
+            TN.spme = mean(TN, na.rm = T)) %>% 
+  ungroup()
+
+
+####Create WIP.wl_AllFut####
+#change this back from ONEBAY if it works.
+WIP.wlAllFut_ONEBAY.nodetre = left_join(WIP.wl_sumPP.nodetre, WIP.wl_spPP.nodetre) %>% 
+  rename("Year" = "year.x", "Year.ref" = "year.y") #%>% #keeping the year.y because we need the reference years to be the same between stations for each simulation.
+#arrange(Year.ref, Year, Station)
+
+vroom_write(WIP.wlAllFut_ONEBAY.nodetre, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wlAllFut_ONEBAY.nodetre.csv")
+WIP.wlAllFut_ONEBAY.nodetre = 
+  vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wlAllFut_ONEBAY.nodetre.csv")
+
+WIP.wland_OneFuture.no2021.nodetre = WIP.wlAllFut_ONEBAY.nodetre %>% 
+  group_by(Station) %>%
+  mutate(Sal.sumy1max = lag(Sal.summax, n = 1, order_by = Year), 
+         Temp.sumy1me = lag(Temp.summe, n = 1, order_by = Year), 
+         Temp.sumy1med = lag(Temp.summed, n = 1, order_by = Year))
+#Filter out 
+WIP.wland_One2021.nodetre = WIP.wland_OneFuture.no2021.nodetre %>% filter(Year == "2021") %>% 
+  select(-Sal.sumy1max, -Temp.sumy1me, -Temp.sumy1med) %>%
+  full_join(twentyone) 
+
+#WIP.wland_OneFuture.nodetre, actually all futures ;)####
+WIP.wland_OneFuture.nodetre = WIP.wland_OneFuture.no2021.nodetre %>% #OneFuture is a nisnomer... this is all futures
+  filter(!Year == "2021") %>%
+  bind_rows(WIP.wland_One2021.nodetre) %>% 
+  replace_na(list(Temp.sumy1me = 25.13100, Temp.sumy1med = 25.13100, Sal.sumy1max = 0.1)) %>% #this is only for the XHH station..
+  ungroup() %>%
+  arrange(Station, Year)
+
+vroom_write(WIP.wland_OneFuture.nodetre,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/WIP.wland_OneFuture.nodetre.csv")
 
 
 
+
+
+#OLD ONEBAY CODE can delete maybe. 8/4/22 ####
 #combine SMOO and DETREND (formerly _ProjPrep)####
 WIP.wl_PP = WIP.wl.meanyearSMOO %>% 
-  left_join(CBPall_DETREND, #%>% filter(!year < 2000), #%>% #NEW! Filter only year 2000 data and beyond. Too many missing values in the past and also why compare 2040 to 1988?? 
+  left_join(CBPall_DETREND84, #%>% filter(!year < 2000), #%>% #NEW! DETREND is Filtered only year 2000 data and beyond. Too many missing values in the past and also why compare 2040 to 1988?? #NEW AGAIN!!!! Went back to 84 becauyse its detrended
             #  filter(! year %in% c(2020)),  #2020 has incomplete data #but i might fill it in with medians.......
             by = c("Station", "DM")) %>% #detre = NoWIP.wl data, smooth = delta. So should be .y + .x 
   drop_na() %>% #like 5K points per station over time from unmatched dates
@@ -704,7 +1107,7 @@ WIP.wl_sumPP = WIP.wl_PP %>%
 ####Summarize Spring 
 #Temp.spmed, Temp.spme,Chla.spme, Sal.spme, Secc.spme, TP.spme, TP.spmed, TN.spme
 WIP.wl_spPP = WIP.wl_PP %>% 
-  filter(dplyr::between(month.x, 3, 6)) %>% #late june isnt spring.... 
+  filter(dplyr::between(month.x, 3, 5)) %>% #late june isnt spring.... 
   group_by(Station, year.x, year.y) %>% 
   summarise(Chla.spme = mean(Chla, na.rm = T), 
             Secc.spme = mean(Secc, na.rm = T), 
@@ -725,6 +1128,21 @@ WIP.wlAllFut_ONEBAY = left_join(WIP.wl_sumPP, WIP.wl_spPP) %>%
 #arrange(Year.ref, Year, Station)
 
 vroom_write(WIP.wlAllFut_ONEBAY, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures/WIP.wl.AllFutsmoodetre_ONEBAY.csv")
+
+#View(WIP.wlAllFut_ONEBAY %>% group_by(Station) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))))
+
+ggplot(data = WIP.wlAllFut_ONEBAY %>% filter(Station %in% c("WT4.1", "CB1.1", "EE3.1", "LE5.5-W"))) +
+  geom_point(aes(x = Year, y = Temp.summe, group = Station, color = Station), size = .9) +
+  stat_smooth(aes(x = Year, y = Temp.summe, group = Station, color = Station), method = "lm")
+
+ggplot(data = WIP.wlAllFut_ONEBAY %>% filter(str_detect(Station, "^TF"))) + 
+  stat_smooth(aes(x = Year, y = TP.spme, group = Station), color = "green", method = "lm") +
+  stat_smooth(data = CC.wlAllFut_ONEBAY %>% filter(str_detect(Station, "^TF")),
+              aes(x = Year, y = TP.spme, group = Station), color = "brown", method = "lm")
+
+
+###END OLD ONEBAY CODE #
 
 
 #Build a NoChange Scenario and also just make a clean, no NA, CBP_all ####
@@ -755,6 +1173,31 @@ CBPallclean_sum = CBPall_0020 %>%
          Temp.sumy1me = coalesce(Temp.sumy1me, Temp.summe)) %>%
   ungroup() 
 
+CBPallclean_grow = CBPall_0020 %>% 
+  filter(dplyr::between(month, 3, 7)) %>%
+  group_by(Station, year) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.growme = mean(Chla, na.rm = T), 
+            Chla.growmax = max(Chla, na.rm = T),
+            Secc.growme = mean(Secc, na.rm = T), 
+            Secc.growmed = median(Secc, na.rm = T), 
+            Sal.growmed = median(Sal, na.rm = T), 
+            Sal.growmax = max(Sal, na.rm = T),
+            Sal.growme = mean(Sal, na.rm = T), 
+            Temp.growmin = min(Temp, na.rm = T), 
+            Temp.growmax = max(Temp, na.rm = T),
+            Temp.growme = mean(Temp, na.rm = T), 
+            Temp.growmed = median(Temp, na.rm = T),
+            TP.growme = mean(TP, na.rm = T), 
+            TN.growme = mean(TN, na.rm = T)) %>% 
+  group_by(Station) %>%
+  mutate(Sal.growy1max = lag(Sal.growmax, order_by = year), 
+         Temp.growy1med = lag(Temp.growmed, order_by = year), 
+         Temp.growy1me = lag(Temp.growme, order_by = year)) %>%
+  mutate(Sal.growy1max = coalesce(Sal.growy1max, Sal.growmax), 
+         Temp.growy1med = coalesce(Temp.growy1med, Temp.growmed), 
+         Temp.growy1me = coalesce(Temp.growy1me, Temp.growme)) %>%
+  ungroup() 
+
 ####Summarize Spring 
 CBPallclean_sp = CBPall_0020 %>% 
   filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... #FYI i found this to be 3, 9 for the model data
@@ -771,80 +1214,25 @@ CBPallclean_sp = CBPall_0020 %>%
 
 
 
-CBPallClean = left_join(CBPallclean_sp, CBPallclean_sum) %>%
+CBPallClean = left_join(CBPallclean_sp, CBPallclean_sum) %>% 
+  left_join(CBPallclean_grow) %>%
   drop_na() #NAs/INFs are from the problem stations. Can prob drop
 
-SAVWQ_past = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_semForPredictions.csv") 
+SAVCommDensWQ_ForPred = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv") 
 
 #SAV WQ ALL CLEAN 00-2020####
 #I think this is a great and beautiful dataset of the past 20 years 2000-2020
 SAVWQallClean = CBPallClean %>% rename(STATION = Station) %>%
-  right_join(SAVWQ_past %>% select(STATION:SAVArea) %>% filter(year > 1999))
+  right_join(SAVCommDensWQ_ForPred %>% select(STATION:SAVArea) %>% filter(year > 1999))
 
 vroom_write(SAVWQallClean, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean.csv") 
 
 SAVWQallClean = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean.csv")
 
 #Build complete AllClean from 1985 onward####
-#build this DF of empty rows but its the "complete" set of years and months
-CBPYears_84 = as_tibble(seq(from = 1985, to = 2020, by = 1)) %>% #Note, not 2019 but 2020
-  rename("year" = "value") %>% 
-  group_by(year) %>%
-  summarise(month = seq(from = 1, to = 12, by = 1)) %>%
-  group_by(year, month) %>%
-  # summarise(day = seq(from = 1, to = 31, by = 1)) %>%
-  # group_by(year, month, day) %>%
-  summarize(Station = CBPstations, Temp = NA, Sal = NA, Secc = NA, Chla = NA, TN = NA, TP = NA)
+CBPall_8420 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBPall_8420.csv")
 
-CBPall_84 = CBPall  %>%
-  #filter(year > 1999) %>% #Filter out years before 2000. 
-  rename("Station" = "STATION") %>% #rename to match w projction data
-  select(Station:Chla) %>% #we dont need the .D variables
-  # drop_na() %>% #drops 20,000 points #new median method 5/3/22... maybe dont do this? 
-  group_by(Station, year) %>% #
-  mutate(day = day(date)) %>%
-  mutate(DM = format(as.Date(date), "%m-%d")) %>%
-  mutate(date = as.Date(date)) %>%
-  select(Station, date, DM, year, month, day, TN:Chla) %>%
-  select(-TSS)
-
-#DF of every missing month of data for every station. We will replace these with medians
-CBPall_missingmo84 = anti_join(CBPYears_84, CBPall_84, by = c("year", "month", "Station"))
-
-CBPall_allmo84 = full_join(CBPall_84, CBPall_missingmo84) 
-
-#monthly medians
-CBPall_MED84 = CBPall_84 %>% 
-  # group_by(Station, month) %>% 
-  # mutate(date_med = median(as.Date(date))) %>% #janky creation of fake date for DM matchup later
-  # mutate(DM_med = format(as.Date(date_med), "%m-%d")) %>%
-  group_by(Station, month) %>%
-  summarize(across(TN:Chla, ~median(., na.rm = T), .names = "{.col}_med")) %>%
-  select(Station, month, TN_med:Chla_med) %>% ungroup() %>%
-  full_join(CBPYears_84) %>% #and now fill in missing months
-  group_by(Station) %>% 
-  mutate(across(TN_med:Chla_med, ~median(., na.rm = T), .names = "{.col}_Y")) %>% 
-  ungroup() %>%
-  group_by(Station, month) %>%
-  mutate(Temp_med = coalesce(Temp_med, Temp_med_Y), Sal_med = coalesce(Sal_med, Sal_med_Y), Secc_med = coalesce(Secc_med, Secc_med_Y), 
-         Chla_med = coalesce(Chla_med, Chla_med_Y), TN_med = coalesce(TN_med, TN_med_Y), TP_med = coalesce(TP_med, TP_med_Y)) %>%
-  group_by(Station, month) %>%
-  mutate(year = seq(from = 1985, to = 2020, by = 1)) %>%
-  mutate(day = 20) %>% 
-  mutate(date = make_date(year, month, day)) %>%
-  mutate(DM = format(as.Date(date), "%m-%d")) %>% 
-  group_by(Station, month, DM, year) %>% 
-  summarize(across(TN_med:Chla_med, ~mean(., na.rm = T)) )
-
-CBPall_8520 = full_join(CBPall_allmo84, 
-                        CBPall_MED84, by = c("Station", "month", "year")) %>%
-  #  group_by(Station, month) %>%
-  mutate(DM = coalesce(DM.x, DM.y), Temp = coalesce(Temp, Temp_med), Sal = coalesce(Sal, Sal_med), Secc = coalesce(Secc, Secc_med), 
-         Chla = coalesce(Chla, Chla_med), TN = coalesce(TN, TN_med), TP = coalesce(TP, TP_med)) %>%
-  # ungroup() %>% 
-  select(Station, DM, year, month, TN:Chla)
-
-CBPallclean_sum85 = CBPall_8520 %>% 
+CBPallclean_sum84 = CBPall_8420 %>% 
   filter(dplyr::between(month, 5, 8)) %>%
   group_by(Station, year) %>%  #do i need to rowwise instead. no...
   summarize(Chla.summe = mean(Chla, na.rm = T), 
@@ -869,9 +1257,34 @@ CBPallclean_sum85 = CBPall_8520 %>%
          Temp.sumy1me = coalesce(Temp.sumy1me, Temp.summe)) %>%
   ungroup() 
 
+CBPallclean_grow84 = CBPall_8420 %>% 
+  filter(dplyr::between(month, 3, 7)) %>%
+  group_by(Station, year) %>%  #do i need to rowwise instead. no...
+  summarize(Chla.growme = mean(Chla, na.rm = T), 
+            Chla.growmax = max(Chla, na.rm = T),
+            Secc.growme = mean(Secc, na.rm = T), 
+            Secc.growmed = median(Secc, na.rm = T), 
+            Sal.growmed = median(Sal, na.rm = T), 
+            Sal.growmax = max(Sal, na.rm = T),
+            Sal.growme = mean(Sal, na.rm = T), 
+            Temp.growmin = min(Temp, na.rm = T), 
+            Temp.growmax = max(Temp, na.rm = T),
+            Temp.growme = mean(Temp, na.rm = T), 
+            Temp.growmed = median(Temp, na.rm = T),
+            TP.growme = mean(TP, na.rm = T), 
+            TN.growme = mean(TN, na.rm = T)) %>% 
+  group_by(Station) %>%
+  mutate(Sal.growy1max = lag(Sal.growmax, order_by = year), 
+         Temp.growy1med = lag(Temp.growmed, order_by = year), 
+         Temp.growy1me = lag(Temp.growme, order_by = year)) %>%
+  mutate(Sal.growy1max = coalesce(Sal.growy1max, Sal.growmax), 
+         Temp.growy1med = coalesce(Temp.growy1med, Temp.growmed), 
+         Temp.growy1me = coalesce(Temp.growy1me, Temp.growme)) %>%
+  ungroup() 
+
 ####Summarize Spring 
-CBPallclean_sp85 = CBPall_8520 %>% 
-  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... 
+CBPallclean_sp84 = CBPall_8420 %>% 
+  filter(dplyr::between(month, 3, 5)) %>% #late june isnt spring.... #FYI i found this to be 3, 9 for the model data
   group_by(Station, year) %>% 
   summarise(Chla.spme = mean(Chla, na.rm = T), 
             Secc.spme = mean(Secc, na.rm = T), 
@@ -883,16 +1296,21 @@ CBPallclean_sp85 = CBPall_8520 %>%
             TN.spme = mean(TN, na.rm = T)) %>% 
   ungroup()
 
-CBPallClean85 = left_join(CBPallclean_sp85, CBPallclean_sum85) %>%
+
+
+CBPallClean84 = left_join(CBPallclean_sp84, CBPallclean_sum84) %>% 
+  left_join(CBPallclean_grow84) %>%
   drop_na() #NAs/INFs are from the problem stations. Can prob drop
 
-#SAVWQ allclean 1985-2020####
-SAVWQallClean_85 = CBPallClean85 %>% rename(STATION = Station) %>%
-  right_join(SAVWQ_past %>% select(STATION:SAVArea) %>% filter(year > 1984))
+SAVCommDensWQ_ForPred = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv") 
 
-vroom_write(SAVWQallClean_85, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean 1985-2020.csv") 
+#SAV WQ ALL CLEAN 84-2020####
+#I think this is a great and beautiful dataset of the past 20 years 2000-2020
+SAVWQallClean84 = CBPallClean84 %>% rename(STATION = Station) %>%
+  right_join(SAVCommDensWQ_ForPred %>% select(STATION:SAVArea))
 
-#Now create this into the future.
+vroom_write(SAVWQallClean84, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVWQallClean84.csv")
+
 
 
 

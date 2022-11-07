@@ -61,9 +61,33 @@ SAVCommunityDens_AllStations <- AllCommunitiesDensityTime %>%
   select(SpCluster, Station, Year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, dens.percomp, dens.percomp.y1, SAVArea.percomp.change, SAVArea, denscomp.max, SAV_HA.max) %>%
   filter(!denscomp.max < 1) #filter out teenie stations? if not this, == 0 so at least get the 0s out
 
+#1392 0s in this dataset. Many of them are because of split zones. About half of the points are less than 150 denscompmax.
+
 #New MASTER Bay Community SAV Dataset!!!#####
 write_csv(SAVCommunityDens_AllStations, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommunityDens_AllStations.csv")
 write_csv(SAVCommunityDens_AllStations, "~/Documents/R projects/Predicting-SAV/data/SAVCommunityDens_AllStations.csv")
+
+#SATATION SIZE#####
+#one figure showing all of the stations that are big, looking sexy as fuck, by SpCluster
+smallstations = SAVCommunityDens_AllStations %>% filter(denscomp.max < 20)  #1116
+mediumstations = SAVCommunityDens_AllStations %>% filter(between(denscomp.max, 20, 200)) #1512
+largestations = SAVCommunityDens_AllStations %>% filter(between(denscomp.max, 200, 1200)) #1836
+hugestations = SAVCommunityDens_AllStations %>% filter(denscomp.max > 1200) #504
+
+hist(smallstations$denscomp.max)
+hist(mediumstations$denscomp.max)
+hist(largestations$denscomp.max)
+hist(hugestations$denscomp.max)
+
+
+ggplot(data = largestations %>% filter(str_detect(SpCluster, "^Rup"))) +
+  geom_point(aes(x = Year, y = dens.weight.mean), size = 1.8, color = "blue") +
+  geom_line(aes(x = Year, y = dens.weight.mean), size = 1.1, color = "blue") +
+  # stat_smooth(aes(x = Year, y = dens.weight.mean), method = "lm", color = "blue") +
+  geom_point(data = hugestations %>% filter(str_detect(SpCluster, "^Rup")), aes(x = Year, y = dens.weight.mean), size = .9, color = "red") + 
+  geom_line(data = hugestations %>% filter(str_detect(SpCluster, "^Rup")), aes(x = Year, y = dens.weight.mean), size = .9, color = "red") +
+  # stat_smooth(data = hugestations %>% filter(str_detect(SpCluster, "^Rup")), aes(x = Year, y = dens.weight.mean), method = "lm", color = "red") +
+  facet_wrap(~Station)#, scales = "free_y")
 
 #CBP.WQ_69vars = read.csv("~/Documents/R projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
 #CBP.WQ_69vars = read.csv("/Volumes/savshare2/Current Projects/Predicting-SAV/data/CBP.WQ_69vars.csv")
@@ -72,26 +96,198 @@ write_csv(SAVCommunityDens_AllStations, "~/Documents/R projects/Predicting-SAV/d
 #  rename(year = Year, STATION = Station) %>%
  # left_join(CBP.WQ_69vars)
 
-CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv")
+CBP.WQ_forPredictions = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Water Quality/CBP.WQ_forPredictions.csv") #from tidyCBPWQ_2020.R
+SAVCommunityDens_AllStations = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommunityDens_AllStations.csv")
 
-SAVCommDensWQ_forPredictions <- SAVCommunityDens_AllStations %>%
+CBP.WQ_fixLE5.5 = CBP.WQ_forPredictions %>% filter(STATION %in% c("LE5.5-W", "LE5.5")) %>%
+  mutate(STATION = "LE5.5-W") %>% group_by(year, STATION) %>% 
+  summarize(across(everything(), ~mean(.x, na.rm = T))) %>% ungroup()#dont really need to mean this but whatever
+CBP.WQ_forPredictions = CBP.WQ_forPredictions %>% filter(!STATION %in% c("LE5.5-W", "LE5.5")) %>%
+  bind_rows(CBP.WQ_fixLE5.5) %>%
+  arrange(STATION, year)
+
+SAVCommDensWQ <- SAVCommunityDens_AllStations %>% #take this DF to assemble climate data.R to median replace NAs and remove 0s
   rename(year = Year, STATION = Station) %>%
- left_join(CBP.WQ_forPredictions)
+ left_join(CBP.WQ_forPredictions) 
 
-vroom_write(SAVCommDensWQ_forPredictions, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_forPredictions.csv")
-vroom_write(SAVCommDensWQ_forPredictions, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_forPredictions.csv")
+vroom_write(SAVCommDensWQ, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ.csv") #I call this SAVCommDensWQ_fP in the assemble climate data.R file
+vroom_write(SAVCommDensWQ, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ.csv")
 
+####Build NA-less SAVCommDensWQ#####
+#Load in the SAV change per year data, merged with CBP WQ data, with the 69 variables of interest selected:
 
-
+SAVCommDensWQ = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ.csv") #this is made in the communityDFs.R code file
 
 #nacheck
-#View(SAVCommDensWQ_69 %>% group_by(year) %>% 
-#       summarise(across(everything(), ~ sum(is.na(.)))) %>%
- # select(STATION, year, dens.percomp.change, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Secc.summe, Secc.spme, TP.spme, TP.summe, TN.spme, TN.summe))
+pastNAs = SAVCommDensWQ %>% group_by(STATION) %>%  #group_by(year) is also helpful to look at
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  select(year, SpCluster, STATION, Temp.sumy1med:TN.summe) #of course there are NAs in the change col for 1984
 
-#New MASTER Bay SAV Density and WQ Dataset!!!#####
-#write_csv(SAVCommDensWQ_69, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69.csv")
-#write_csv(SAVCommDensWQ_69, "~/Documents/R projects/Predicting-SAV/data/SAVCommDensWQ_69.csv")
+#not a great precedent to set but this is one station w only 10 years of data. Happens to be one of the only MM stations tho
+SAVCommDensWQ_fP_MEDIANS_XHH = SAVCommDensWQ %>% filter(STATION == "XHH4742") %>%
+  filter(between(year, 2006,2016)) %>% #modern medians make less sense, although they could be plugged into 2020 data maybe for the spring.
+  group_by(STATION) %>%
+  summarize(across(Temp.sumy1med:TN.summe, ~median(., na.rm = T), .names = "{.col}_med"))
+
+SAVCommDensWQ_fP_MEDIANS_preY2K = SAVCommDensWQ %>% 
+  filter(!STATION %in% c("XHH4742")) %>% #take this one out for now
+  filter(between(year, 1984, 1999)) %>% #picked these years bc this is where most of the NAs are from..except 2020 and XXH station
+  group_by(STATION) %>%
+  summarize(across(Temp.sumy1med:TN.summe, ~median(., na.rm = T), .names = "{.col}_med")) %>% 
+  bind_rows(SAVCommDensWQ_fP_MEDIANS_XHH) #bind this stupid station back in
+  
+
+SAVCommDensWQ_fP_MEDIANS_postY2K = SAVCommDensWQ %>% 
+  filter(!STATION %in% c("XHH4742")) %>% #take this one out for now
+  filter(between(year, 2000,2020)) %>% #modern medians make less sense, although they could be plugged into 2020 data maybe for the spring.
+  group_by(STATION) %>%
+  summarize(across(Temp.sumy1med:TN.summe, ~median(., na.rm = T), .names = "{.col}_med")) %>%
+  bind_rows(SAVCommDensWQ_fP_MEDIANS_XHH) #bind this stupid station back in
+
+
+
+
+#We deal with 0s by eliminating any years where the years 2 before and 2 after were 0 (5 year chunk of 0s), with the antijoin code
+#NOTE: 8/4/22 I'm worried that this is too early to take these out, and creates problems down the road. The 0s bc its fully in one SpCluster but it only gets grass a couple times is def something that needs to be removed though. How many times to include? half? DECISION: create a dataframe that doesnt do these 0 filtrations
+SAVCommZeros = SAVCommDensWQ %>%
+  mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1), dens.weight.mean.1y = lead(dens.weight.mean))  %>% 
+  mutate(dens.weight.mean.2y = lead(dens.weight.mean.1y)) %>%
+  filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0 & dens.weight.mean.1y == 0 & dens.weight.mean.2y == 0)
+
+
+#Who are these 0s? 
+#look at just one 0
+#invest.savzeros = SAVCommDensWQ %>%
+#  dplyr::filter(dens.weight.mean == 0) %>% 
+#  group_by(STATION, SpCluster) %>% count %>%
+#  full_join(SAVCommDensWQ %>% select(STATION, SpCluster, denscomp.max), by = c("STATION","SpCluster"))
+#look at who gets filtered out with zero out code 
+#invest.savzeros2 = SAVCommZeros %>% 
+#  group_by(STATION, SpCluster) %>% count
+
+#DECISION 8/4: Add a year to the 0 filter so its 5 years of 0s getting filtered out. Also, carry a non-0 filtered DF all the way through pl now. We will name it .with0s
+
+#anti join the 0s to get a No0 df
+
+#Create SAVCommDensWQ_ForPred, which is the SAVCommDensWQ 1984-2020 with 0s filtered and NAs turned into medians
+#First, the first half of the data w median replaced NAs
+SAVCommDensWQ_ForPred.preY2K = SAVCommDensWQ %>% #hold off on 0 filtering
+  filter(between(year, 1984, 1999)) %>%
+  full_join(SAVCommDensWQ_fP_MEDIANS_preY2K) %>% #fill in NAs with old medians
+  group_by(STATION) %>%
+  mutate(Temp.sumy1med = coalesce(Temp.sumy1med, Temp.sumy1med_med), #turn all of the NAs into medians
+         Temp.sumy1me = coalesce(Temp.sumy1me, Temp.sumy1me_med),
+         Temp.summe = coalesce(Temp.summe, Temp.summe_med),
+         Temp.summax = coalesce(Temp.summax, Temp.summax_med),
+         Temp.summed = coalesce(Temp.summed, Temp.summed_med),
+         Temp.summin = coalesce(Temp.summin, Temp.summin_med),
+         Temp.spme = coalesce(Temp.spme, Temp.spme_med),
+         Temp.spmed = coalesce(Temp.spmed, Temp.spmed_med),
+         Sal.summe = coalesce(Sal.summe, Sal.summe_med),
+         Sal.summax = coalesce(Sal.summax, Sal.summax_med),
+         Sal.summed = coalesce(Sal.summed, Sal.summed_med),
+         Sal.spme = coalesce(Sal.spme, Sal.spme_med),
+         Sal.sumy1max = coalesce(Sal.sumy1max, Sal.sumy1max_med),
+         Secc.summe = coalesce(Secc.summe, Secc.summe_med),
+         Chla.spme = coalesce(Chla.spme, Chla.spme_med),
+         Chla.summe = coalesce(Chla.summe, Chla.summe_med),
+         TN.spme = coalesce(TN.spme, TN.spme_med),
+         TN.summe = coalesce(TN.summe, TN.summe_med),
+         TP.spme = coalesce(TP.spme, TP.spme_med),
+         TP.summe = coalesce(TP.summe, TP.summe_med)) %>%
+  select(STATION, year, SpCluster, 
+         dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, 
+         dens.percomp.change, denscomp.max, SAVArea, 
+         Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, Temp.spmed, Temp.spme, 
+         Temp.summin, Temp.summe, Temp.summed, Temp.summax, Chla.spme, Chla.summe, 
+         Sal.summed, Sal.spme, Sal.summe,  Secc.summe, TP.spme, TP.summe, TN.spme, TN.summe) 
+
+SAVCommDensWQ_ForPred.postY2K = SAVCommDensWQ %>% #hold off on 0 filtering
+  filter(between(year, 2000, 2020)) %>%
+  full_join(SAVCommDensWQ_fP_MEDIANS_postY2K) %>% #fill in NAs with modern medians
+  group_by(STATION) %>%
+  mutate(Temp.sumy1med = coalesce(Temp.sumy1med, Temp.sumy1med_med), #turn all of the NAs into medians
+         Temp.sumy1me = coalesce(Temp.sumy1me, Temp.sumy1me_med),
+         Temp.summe = coalesce(Temp.summe, Temp.summe_med),
+         Temp.summax = coalesce(Temp.summax, Temp.summax_med),
+         Temp.summed = coalesce(Temp.summed, Temp.summed_med),
+         Temp.summin = coalesce(Temp.summin, Temp.summin_med),
+         Temp.spme = coalesce(Temp.spme, Temp.spme_med),
+         Temp.spmed = coalesce(Temp.spmed, Temp.spmed_med),
+         Sal.summe = coalesce(Sal.summe, Sal.summe_med),
+         Sal.summax = coalesce(Sal.summax, Sal.summax_med),
+         Sal.summed = coalesce(Sal.summed, Sal.summed_med),
+         Sal.spme = coalesce(Sal.spme, Sal.spme_med),
+         Sal.sumy1max = coalesce(Sal.sumy1max, Sal.sumy1max_med),
+         Secc.summe = coalesce(Secc.summe, Secc.summe_med),
+         Chla.spme = coalesce(Chla.spme, Chla.spme_med),
+         Chla.summe = coalesce(Chla.summe, Chla.summe_med),
+         TN.spme = coalesce(TN.spme, TN.spme_med),
+         TN.summe = coalesce(TN.summe, TN.summe_med),
+         TP.spme = coalesce(TP.spme, TP.spme_med),
+         TP.summe = coalesce(TP.summe, TP.summe_med)) %>%
+  select(STATION, year, SpCluster, 
+         dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, 
+         dens.percomp.change, denscomp.max, SAVArea, 
+         Temp.sumy1med, Temp.sumy1me, Sal.summax, Sal.sumy1max, Temp.spmed, Temp.spme, 
+         Temp.summin, Temp.summe, Temp.summed, Temp.summax, Chla.spme, Chla.summe, 
+         Sal.summed, Sal.spme, Sal.summe,  Secc.summe, TP.spme, TP.summe, TN.spme, TN.summe) 
+
+#Ok Put them together to create: 
+#SAVCommDensWQ_ForPred####
+SAVCommDensWQ_ForPred.with0s = full_join(SAVCommDensWQ_ForPred.preY2K, SAVCommDensWQ_ForPred.postY2K) %>% 
+  ungroup()
+
+SAVCommDensWQ_ForPred = full_join(SAVCommDensWQ_ForPred.preY2K, SAVCommDensWQ_ForPred.postY2K) %>% 
+  anti_join(SAVCommZeros) %>% ungroup() #anti the 0s 
+
+#naexplore
+#pastNAs1 = SAVCommDensWQ_ForPred %>% group_by(year) %>%  #group_by(year) is also helpful to look at
+#  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+#  select(year, SpCluster, STATION, Temp.sumy1med:TN.summe) 
+#NAs are that problem XHH station in the past where there was no data
+
+#figure to show differences
+ggplot(data = SAVCommDensWQ_ForPred %>% filter(str_detect(STATION, "^LE"))) +
+  geom_point(aes(x = year, y = TN.spme), size = 1.8, color = "black") +
+  geom_line(aes(x = year, y = TN.spme), size = 1.8, color = "black") +
+  stat_smooth(aes(x = year, y = TN.spme), method = "lm", color = "black") +
+  geom_point(data = SAVCommDensWQ %>% filter(str_detect(STATION, "^LE")), aes(x = year, y = TN.spme), size = .9, color = "cyan1") + 
+  geom_line(data = SAVCommDensWQ %>% filter(str_detect(STATION, "^LE")), aes(x = year, y = TN.spme), size = .9, color = "cyan1") +
+  stat_smooth(data = SAVCommDensWQ %>% filter(str_detect(STATION, "^LE")), aes(x = year, y = TN.spme), method = "lm", color = "cyan1") +
+  facet_wrap(~STATION, scales = "free_y")
+
+#figure to depict diff in .with0s and not.
+ggplot(data = SAVCommDensWQ_ForPred %>% filter(str_detect(STATION, "^CB"))) +
+  geom_point(aes(x = year, y = dens.weight.mean), size = 1.8, color = "blue") +
+  #geom_line(aes(x = year, y = dens.weight.mean), size = 1.1, color = "blue") +
+ # stat_smooth(aes(x = year, y = dens.weight.mean), method = "lm", color = "blue") +
+  geom_point(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(STATION, "^CB")), aes(x = year, y = dens.weight.mean), size = .9, color = "red") + 
+ # geom_line(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(STATION, "^CB")), aes(x = year, y = dens.weight.mean), size = .9, color = "red") +
+ # stat_smooth(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(STATION, "^CB")), aes(x = year, y = dens.weight.mean), method = "lm", color = "red") +
+  facet_wrap(~STATION, scales = "free_y")
+
+ggplot(data = SAVCommDensWQ_ForPred %>% filter(str_detect(SpCluster, "^Rup"))) +
+  geom_point(aes(x = year, y = dens.weight.mean), size = 1.8, color = "blue") +
+  #geom_line(aes(x = year, y = dens.weight.mean), size = 1.1, color = "blue") +
+  # stat_smooth(aes(x = year, y = dens.weight.mean), method = "lm", color = "blue") +
+  geom_point(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(SpCluster, "^Rup")), aes(x = year, y = dens.weight.mean), size = .9, color = "red") + 
+  # geom_line(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(SpCluster, "^Rup")), aes(x = year, y = dens.weight.mean), size = .9, color = "red") +
+  # stat_smooth(data = SAVCommDensWQ_ForPred.with0s %>% filter(str_detect(SpCluster, "^Rup")), aes(x = year, y = dens.weight.mean), method = "lm", color = "red") +
+  facet_wrap(~STATION, scales = "free_y")
+
+
+
+#SAVCommDensWQ_ForPred####
+#What is this? It is the SAV, SP Cluster, and ENV data by station by sp cluster. .with0s has all of the 0s and is 725 more points. We also median replaced all of the NAs in this whole dataset. nearly all of the replacements were from the 84-90 time chunk. We have not officially replaced spring 2020 although some NAs were indeed put in that slot. We did a pre and post Y2K median replacement, because there were some more modern NAs but not that many at all.
+#Does this have NO missing years and NO NAs? the .with0s should be that... 
+#View(SAVCommDensWQ_ForPred.with0s %>% ungroup() %>%
+     #  group_by(STATION, SpCluster) %>% 
+     #  count)# YES. No missing years in this DF because of the median replace NA! 
+
+vroom_write(SAVCommDensWQ_ForPred.with0s, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.with0s.csv")
+vroom_write(SAVCommDensWQ_ForPred, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv")
+
 
 
 
