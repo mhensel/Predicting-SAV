@@ -1,0 +1,771 @@
+---
+title: "Predicting-SAV: 2020-2060 Projections"
+author: "Marc Hensel"
+date: "2022-11-07"
+output: html_document
+---
+Predicting-SAV Project: Climate Change and Nutrient Management Projections
+This markdown represents the attempted assembly of the FINAL projection code, plus some summary figures and statistics, for 100 simulations
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+ R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+ Including Plots
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r required packages, echo=FALSE}
+
+library(tidyverse); library(lme4); library(car); library(vroom); library(performance); library(lubridate)
+
+```
+
+
+#Future Env Proj Data by Scenario and Community
+These data frames are for *100 simulations* of predicted environemtal conditions under the "No Further Action" and "Nutrient Management" Scenarios for each of the Zostera, Ruppia, Mixed Mesohaline, and Freshwater communities
+Past data (from CBP WQ Stations 1984-2019 minus some NAs) has been detrended, 
+Future data (from Lew's group 2020-2060) has been smoothed out to remove decadal jumps
+Note: 1000 sims would require changed inputs
+
+```{r load future environmental projections by scenario and by community, echo = FALSE}
+#No Action Scenario
+Zostera.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zostera.OneBay_CC.csv")
+Ruppia.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ruppia.OneBay_CC.csv")
+MixMeso.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/MixMeso.OneBay_CC.csv")
+Fresh.OneBay_CC = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_CC.csv")
+
+##Nutrient Reduction Scenario
+#WIP = Watershed Implementation Program
+Zostera.OneBay_WIP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zostera.OneBay_WIP.csv")
+Ruppia.OneBay_WIP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ruppia.OneBay_WIP.csv")
+MixMeso.OneBay_WIP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/MixMeso.OneBay_WIP.csv")
+Fresh.OneBay_WIP = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Fresh.OneBay_WIP.csv")
+
+```
+
+#Load Essential Prediction Data and Models
+Big chunk bc this a lot of stuff that shouldnt need to be changed anymore. 
+Models included DWM and DPC prediction models! 
+```{r load other essential data}
+####Load these DFs needed for ALL loops but not in loop####
+##SAV Density and WQ per Community over past time#
+
+#SAVCommDensWQ_ForPred = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.csv") #past water quality and sav data 1984-2020. Basically no NAs, just in 1984 and in Temp.summax
+#filter either of these to 00-20 if we want to do that.
+#SAVCommDensWQ_ForPred = vroom("data/SAVCommDensWQ_forPredictions.csv") #github paths
+
+#main past data DF here. 4968 points
+SAVCommDensWQ_ForPred.with0s = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_ForPredictions.with0s.csv")
+
+#View(SAVCommDensWQ_ForPred %>% group_by(year) %>% 
+#       summarise(across(everything(), ~ sum(is.na(.)))))
+
+#vector of all the future years, need this in the projection loop####
+future_yrs = seq(2020, 2060, by = 1) #should this be 2021
+
+```
+
+#Run all Initial Community Dataframes and ME models
+Very crucial chunk to run. This creates the following for each community: 
+XXX_station = list of stations that feeds into loop
+XXXDensWQsem.No0_Predict = Community filtered, past data with just the variables needed
+TWO Models: XXXInt.lmer = modelling change in density percomposite area 
+            XXXDWM.lmer = modelling annual density weighted area (not change!)
+It would be fine to chunk this up by community but just creates more clicks
+
+```{r Initial Community Dataframes and ME models, echo=FALSE}
+
+
+#Zostera Initial and Model####
+#DF and model for Zostera
+ZoDensWQsem.No0_Predict = SAVCommDensWQ_ForPred.with0s %>% #allclean is the 2000-2020 data! 
+  filter(SpCluster == "Zostera") %>%
+#  filter(!STATION %in% c("LE5.5-W")) %>% #seriously fuck this station
+  filter(!denscomp.max < 1) %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1,
+         denscomp.max, dens.percomp, 
+         Chla.spme, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.spme) %>%
+  mutate(dens.weight.mean = case_when(dens.weight.mean == 0 ~ 0.0001, 
+                                      TRUE ~ dens.weight.mean)) %>%
+  mutate(dens.weight.mean.y1 = case_when(dens.weight.mean.y1 <= 0 ~ 0.0001, 
+                                         TRUE ~ dens.weight.mean.y1)) %>%
+  as.data.frame()
+
+#vector of zos_stations for the loop
+zos_station = ZoDensWQsem.No0_Predict$STATION
+
+ZoInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1  + 
+                     log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + 
+                     (dens.percomp.y1:log10(Temp.spmed)) +  
+                     (dens.percomp.y1:log10(Sal.summed)) + (dens.percomp.y1:log10(Chla.spme))+ (dens.percomp.y1:log10(Secc.summe)) + (1|STATION), data = ZoDensWQsem.No0_Predict)
+model_performance(ZoInt.lmer)
+
+#check_collinearity(ZoInt.lmer)
+
+ZoDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1)  + 
+                     log10(Temp.sumy1med) + log10(Sal.summed) + log10(Chla.spme) + log10(Secc.summe) + 
+                     (log10(dens.weight.mean.y1):log10(Temp.spmed)) +  
+                     (log10(dens.weight.mean.y1):log10(Sal.summed)) + (log10(dens.weight.mean.y1):log10(Chla.spme))+ (log10(dens.weight.mean.y1):log10(Secc.summe)) + (1|STATION), data = ZoDensWQsem.No0_Predict)
+
+model_performance(ZoDWM.lmer) #DINGDINGDING
+check_model(ZoDWM.lmer)
+AIC(ZoInt.lmer, ZoDWM.lmer)
+
+#Ruppia Initial and Model####
+#load in Ru model and dataa
+RuDensWQsem.No0_Predict = SAVCommDensWQ_ForPred.with0s %>% #allclean is the 2000-2020 data! 
+  filter(SpCluster == "Ruppia") %>%
+  filter(!denscomp.max < 1) %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max, dens.percomp, 
+         Temp.spme, Chla.spme, Sal.spme, TP.spme, TN.spme) %>%
+  drop_na() %>% #1214 points
+  mutate(dens.weight.mean = case_when(dens.weight.mean <= 0 ~ 0.0001, 
+                                      TRUE ~ dens.weight.mean)) %>%
+  mutate(dens.weight.mean.y1 = case_when(dens.weight.mean.y1 <= 0 ~ 0.0001, 
+                                         TRUE ~ dens.weight.mean.y1)) %>%
+  as.data.frame()
+
+ru_station = RuDensWQsem.No0_Predict$STATION
+
+RuInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(Chla.spme) + 
+                     log10(TP.spme) + log10(TN.spme) + log10(Temp.spme) +
+                     (dens.percomp.y1:log10(Sal.spme)) + (dens.percomp.y1:log10(Chla.spme)) + 
+                     (log10(TP.spme):dens.percomp.y1) + (log10(TN.spme):dens.percomp.y1) + 
+                     (log10(Temp.spme):dens.percomp.y1) + (1|STATION), 
+                   data = RuDensWQsem.No0_Predict)
+model_performance(RuInt.lmer)
+
+RuDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + log10(Chla.spme) + 
+                     log10(TP.spme) + log10(TN.spme) + log10(Temp.spme) +
+                     (log10(dens.weight.mean.y1):log10(Sal.spme)) + (log10(dens.weight.mean.y1):log10(Chla.spme)) + 
+                     (log10(TP.spme):log10(dens.weight.mean.y1)) + (log10(TN.spme):log10(dens.weight.mean.y1)) + 
+                     (log10(Temp.spme):log10(dens.weight.mean.y1)) + (1|STATION), 
+                   data = RuDensWQsem.No0_Predict)
+model_performance(RuDWM.lmer)
+
+#MixedMeso Initial and Model####
+MMDensWQsem.No0_Predict = SAVCommDensWQ_ForPred.with0s %>% #allclean is the 2000-2020 data! 
+  filter(SpCluster == "MixedMeso") %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max, dens.percomp, 
+         Chla.summe, Temp.summe, Temp.summin, TP.summe, TN.summe, Sal.sumy1max) %>%
+  drop_na() %>% #161
+  mutate(dens.weight.mean = case_when(dens.weight.mean <= 0 ~ 0.0001, 
+                                      TRUE ~ dens.weight.mean)) %>%
+  mutate(dens.weight.mean.y1 = case_when(dens.weight.mean.y1 <= 0 ~ 0.0001, 
+                                         TRUE ~ dens.weight.mean.y1)) %>%
+  as.data.frame()
+
+MM_station = MMDensWQsem.No0_Predict$STATION
+
+MMInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + log10(TP.summe):dens.percomp.y1 +log10(TN.summe):dens.percomp.y1+ log10(Temp.summin):dens.percomp.y1 + (1|STATION), data = MMDensWQsem.No0_Predict)
+
+model_performance(MMInt.lmer)
+
+MMDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):log10(dens.weight.mean.y1) + log10(Chla.summe):log10(dens.weight.mean.y1) + log10(TP.summe):log10(dens.weight.mean.y1) +log10(TN.summe):log10(dens.weight.mean.y1)+ log10(Temp.summin):log10(dens.weight.mean.y1) + (1|STATION), data = MMDensWQsem.No0_Predict)
+
+model_performance(MMDWM.lmer)
+
+#Fresh Initial and Model####
+FreshDensWQsem.No0_Predict = SAVCommDensWQ_ForPred.with0s %>% #allclean is the 2000-2020 data! 
+  filter(SpCluster == "Fresh") %>%
+  ungroup() %>% 
+  select(STATION, year, dens.percomp.y1, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, denscomp.max, dens.percomp, 
+         Chla.summe, Temp.summe, Temp.summax, Temp.sumy1me, TP.summe, TN.summe, Sal.summe) %>%
+  drop_na() %>% #161
+  mutate(Sal.summe = Sal.summe + .1) %>%
+  mutate(dens.weight.mean = case_when(dens.weight.mean <= 0 ~ 0.0001, 
+                                      TRUE ~ dens.weight.mean)) %>%
+  mutate(dens.weight.mean.y1 = case_when(dens.weight.mean.y1 <= 0 ~ 0.0001, 
+                                         TRUE ~ dens.weight.mean.y1)) %>%
+  as.data.frame()
+
+F_station = FreshDensWQsem.No0_Predict$STATION
+
+FInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + #CHECK FINT MODEL####
+                    log10(Sal.summe) + log10(Chla.summe) + 
+                    log10(TP.summe)  + 
+                    log10(Temp.sumy1me) + log10(Temp.summe)  + 
+                    log10(Sal.summe):dens.percomp.y1 + log10(Chla.summe):dens.percomp.y1 + 
+                    #log10(TP.summe):dens.percomp.y1  + #these ones make it singular so idk
+                    log10(Temp.sumy1me):dens.percomp.y1 + 
+                    (1|STATION), data = FreshDensWQsem.No0_Predict) 
+
+model_performance(FInt.lmer)
+
+FDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + #CHECK FINT MODEL####
+                  log10(Sal.summe) + log10(Chla.summe) + 
+                    log10(TP.summe)  + 
+                    log10(Temp.sumy1me) + log10(Temp.summe)  + 
+                    log10(Sal.summe):log10(dens.weight.mean.y1) + log10(Chla.summe):log10(dens.weight.mean.y1) + 
+                    log10(TP.summe):log10(dens.weight.mean.y1)  + #these ones make it singular so idk
+                    log10(Temp.sumy1me):log10(dens.weight.mean.y1) + 
+                    (1|STATION), data = FreshDensWQsem.No0_Predict) 
+
+model_performance(FDWM.lmer)
+```
+
+
+#Predict the Future!!!
+Final prediction method is to include density percomp change predictions and DWM predictions together
+These pasted ones as of Nov 7 2022 come from climate projections_redux
+No adaptive necessary
+#Zostera Community, No Action Scenario
+100 simulation chunk will take some time!
+```{r Zostera CC}
+
+bigZodatalist = list()
+
+for (t in 1:100){ 
+  #t = 2
+  Zos.OTB_CC = Zostera.OneBay_CC[Zostera.OneBay_CC$simnum_OB == t,] 
+  
+  Zodatalist = list()
+  
+  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 3
+    #subset data by site
+    siteenvdata <- Zos.OTB_CC[Zos.OTB_CC$STATION == zos_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      #  y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],13]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(ZoDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      
+      #col 11 in CYP = dens.percomp | col 11 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] ##dens.weight.mean
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.percomp.change
+      siteenvdata[y,15] <- CurrentYrPredict[1,15] #dens.percomp.changeDPC
+      
+    }
+    
+    Zodatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Zodatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigZodatalist[[t]] <- siteenvdataagg
+  
+}
+
+Zo_CC.PredOneTrueBae.DWM = bigZodatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(Zo_CC.PredOneTrueBae.DWM,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_CC.PredOneTrueBae.DWM.csv")
+
+#biglist, not needed anymore.
+gc(bigZodatalist)
+
+
+```
+
+#Zostera Community, Nutrient Reduction Scenario
+
+```{r Zostera WIP}
+bigZodatalist = list()
+for (t in 1:100){ 
+  #t = 2
+  Zos.OTB_WIP = Zostera.OneBay_WIP[Zostera.OneBay_WIP$simnum_OB == t,] 
+  
+  Zodatalist = list()
+  
+  for(s in 1:length(zos_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 3
+    #subset data by site
+    siteenvdata <- Zos.OTB_WIP[Zos.OTB_WIP$STATION == zos_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      #  y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],13]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(ZoInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(ZoDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      
+      #col 11 in CYP = dens.percomp | col 11 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] ##dens.weight.mean
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.percomp.change
+      siteenvdata[y,15] <- CurrentYrPredict[1,15] #dens.percomp.changeDPC
+      
+    }
+    
+    Zodatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Zodatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigZodatalist[[t]] <- siteenvdataagg
+  
+}
+
+Zo_WIP.PredOneTrueBae.DWM = bigZodatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(Zo_WIP.PredOneTrueBae.DWM,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_WIP.PredOneTrueBae.DWM.csv")
+gc(bigZodatalist)
+
+```
+
+#Ruppia Community, No Action Scenario
+100 simulation chunk will take some time!
+```{r Ruppia CC}
+
+bigRudatalist = list()
+
+for (t in 1:100){ 
+  #t = 2
+  Ru.OTB_CC = Ruppia.OneBay_CC[Ruppia.OneBay_CC$simnum_OB == t,] 
+  
+  Rudatalist = list()
+  
+  for(s in 1:length(ru_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 3
+    #subset data by site
+    siteenvdata <- Ru.OTB_CC[Ru.OTB_CC$STATION == ru_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      #  y = 3
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],9] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(RuInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(RuDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,9] <- CurrentYrPredict[1,9] #dens.percomp
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.weight.mean
+      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.percomp.change
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.weight.meanDPC
+    }
+    
+    Rudatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Rudatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigRudatalist[[t]] <- siteenvdataagg
+  
+} 
+
+Ru_CC.PredOneTrueBae.DWM = bigRudatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(Ru_CC.PredOneTrueBae.DWM,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_CC.PredOneTrueBae.DWM.csv")
+gc(bigRudatalist)
+
+```
+
+#Ruppia Community, Nutrient Reduction Scenario
+
+```{r Ruppia WIP}
+bigRudatalist = list()
+
+for (t in 1:100){ 
+  #t = 2
+  Ru.OTB_WIP = Ruppia.OneBay_WIP[Ruppia.OneBay_WIP$simnum_OB == t,] 
+  
+  Rudatalist = list()
+  
+  for(s in 1:length(ru_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 3
+    #subset data by site
+    siteenvdata <- Ru.OTB_WIP[Ru.OTB_WIP$STATION == ru_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      #y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],9] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 9 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(RuInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(RuDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,9] <- CurrentYrPredict[1,9] #dens.percomp
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.weight.mean
+      siteenvdata[y,12] <- CurrentYrPredict[1,12] #dens.percomp.change
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.weight.meanDPC
+    }
+    
+    Rudatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Rudatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigRudatalist[[t]] <- siteenvdataagg
+  
+} 
+
+#BigRuData#
+Ru_WIP.PredOneTrueBae.DWM = bigRudatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(Ru_WIP.PredOneTrueBae.DWM,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_WIP.PredOneTrueBae.DWM.csv")
+
+gc(bigRudatalist)
+```
+
+#Mixed Mesohaline Community, No Action Scenario
+100 simulation chunk will take some time!
+```{r MixMeso CC}
+
+
+
+
+```
+
+#Mixed Mesohaline Community, Nutrient Reduction Scenario
+
+```{r MixMeso WIP}
+
+```
+
+#Fresh Community, No Action Scenario
+100 simulation chunk will take some time!
+```{r Fresh CC}
+
+bigFdatalist = list()
+
+for (t in 1:100){ 
+  #t = 2
+  F.OTB_CC = Fresh.OneBay_CC[Fresh.OneBay_CC$simnum_OB == t,] 
+  
+  Fdatalist = list()
+  
+  for(s in 1:length(F_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 1
+    #subset data by site
+    siteenvdata <- F.OTB_CC[F.OTB_CC$STATION == F_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      # y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],13]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(FInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(FDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      
+      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.meanDPC
+      siteenvdata[y,15] <- CurrentYrPredict[1,15] #dens.weight.mean
+      
+      
+    }
+    
+    Fdatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Fdatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigFdatalist[[t]] <- siteenvdataagg
+  
+}
+
+
+#BigFData####
+F_CC.P1TB100 = bigFdatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(F_CC.P1TB100,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/F_CC.PredOneTrueBae.DWM100.csv")
+
+gc(bigFdatalist)
+
+```
+
+#Fresh Community, Nutrient Reduction Scenario
+
+```{r Fresh WIP}
+bigFdatalist = list()
+
+for (t in 1:100){ 
+  #t = 2
+  F.OTB_WIP = Fresh.OneBay_WIP[Fresh.OneBay_WIP$simnum_OB == t,] 
+  
+  Fdatalist = list()
+  
+  for(s in 1:length(F_station)) { #length(zos_station)  , but some stations have NA problems so just 11 for now
+    # s = 1
+    #subset data by site
+    siteenvdata <- F.OTB_WIP[F.OTB_WIP$STATION == F_station[s],] 
+    # intdendata <- ZDT2019[ZDT2019$STATION == zos_station[s],]
+    siteenvdata$dens.percomp.change = NA  
+    siteenvdata$dens.weight.meanDPC = NA
+    siteenvdata <- as.data.frame(siteenvdata)
+    
+    
+    for(y in 2:length(future_yrs)) { #HERE is basically why i needed the for loop, to start on 2:
+      # y = 2
+      dens.percomp.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],11] #this var needed for predict(), should be dens.percomp (i.e. y1) #col 11 is dens.percomp
+      dens.weight.mean.y1 <- siteenvdata[siteenvdata$year == future_yrs[y-1],13]
+      thisyrinfo <- siteenvdata[siteenvdata$year == future_yrs[y],] #y-1 for dpcy1 above, y for this yr
+      
+      CurrentYrPredict <- thisyrinfo %>% #kept my tidy code but needed? idk
+        mutate(dens.percomp.change = predict(FInt.lmer, newdata = .)) %>%
+        mutate(dens.weight.mean = 10^(predict(FDWM.lmer, newdata = .))) %>%
+        mutate(dens.percomp = dens.percomp.change + dens.percomp.y1) %>%
+        mutate(dens.percomp = case_when(dens.percomp < 0 ~ 0.0001, 
+                                        dens.percomp > 1 ~ 1.0001,
+                                        TRUE ~ dens.percomp)) %>%
+        mutate(dens.weight.mean = case_when(dens.weight.mean < 0 ~ 0.0001,
+                                            dens.weight.mean > denscomp.max ~ denscomp.max, 
+                                            TRUE ~ dens.weight.mean)) %>%
+        mutate(dens.weight.meanDPC = dens.percomp*denscomp.max) %>%
+        mutate(dens.weight.meanDPC = case_when(dens.weight.mean < 0 ~ 0.0001, 
+                                               TRUE ~ dens.weight.mean))
+      
+      
+      #col 9 in CYP = dens.percomp | col 9 in siteenvdata
+      #col 13 in CYP = dens.percomp.change | col 13 in siteenvdata 
+      #col 14 in CYP = dens.weight.mean | col 14 in siteenvdata 
+      
+      siteenvdata[y,11] <- CurrentYrPredict[1,11] #dens.percomp
+      siteenvdata[y,13] <- CurrentYrPredict[1,13] #dens.percomp.change
+      siteenvdata[y,14] <- CurrentYrPredict[1,14] #dens.weight.meanDPC
+      siteenvdata[y,15] <- CurrentYrPredict[1,15] #dens.weight.mean
+      
+      
+    }
+    
+    Fdatalist[[s]] <- siteenvdata
+    
+  }
+  
+  # rbind together all objects in datalist
+  siteenvdataagg <- bind_rows(Fdatalist)
+  # add column for simnum and populate with t (outer loop iteration)
+  #siteenvdataagg$simnum <- rep(t, length(siteenvdataagg[,1]))
+  # write big dataframe to big data list 
+  bigFdatalist[[t]] <- siteenvdataagg
+  
+}
+
+
+#BigFData####
+F_WIP.P1TB100 = bigFdatalist %>% 
+  map_dfr(as_tibble, .name_repair = "universal")
+
+vroom_write(F_WIP.P1TB100,"/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/F_CC.PredOneTrueBae.DWM100.csv")
+
+
+gc(bigFdatalist)
+```
+
+#Load in Future Seagrass Predictions from R Drive
+dont need to repredict? good! you shouldnt! here is everything already saved into the drive. 
+NOTE: Zo_CC.PredOneTrueBae.DWM is 20 sims right now.
+
+```{r load in PredOneTrueBae.DWM, echo = FALSE }
+Zo_CC.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_CC.PredOneTrueBae.DWM.csv")
+Zo_WIP.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_WIP.PredOneTrueBae.DWM.csv")
+Ru_CC.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_CC.PredOneTrueBae.DWM.csv")
+Ru_WIP.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_WIP.PredOneTrueBae.DWM.csv")
+F_CC.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/F_CC.PredOneTrueBae.DWM.csv")
+F_WIP.PredOneTrueBae.DWM = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/F_WIP.PredOneTrueBae.DWM.csv")
+
+#Really just need to rename the above ones 100 ? maybe not bc takes a long time to vis 100 sims even
+
+Zo_CC.P1TB100 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_CC.PredOneTrueBae.DWM100.csv")
+Zo_WIP.P1TB100 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Zo_WIP.PredOneTrueBae.DWM100.csv")
+Ru_CC.P1TB100 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_CC.PredOneTrueBae.DWM100.csv")
+Ru_WIP.P1TB100 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/Ru_WIP.PredOneTrueBae.DWM100.csv")
+F_CC.P1TB100 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/F_CC.PredOneTrueBae.DWM100.csv")
+F_WIP.P1TB100 = F_WIP.PredOneTrueBae.DWM
+```
+
+#Visualize the Future Environment: Temperature Rise of 2 dec C
+
+```{r Temperature over time graph Zostera community}
+ggplot(data = Zo_WIP.PredOneTrueBae.DWM)+ #%>% filter(between(simnum_OB, 1, 3)) ) +
+  #geom_point(aes(x = year, y = dens.percomp.change, group = STATION, color = simnum_OB), position = position_jitter()) +
+  stat_summary(aes(x = year, y = Temp.sumy1med, group = simnum_OB), fun.data = "mean_se", geom = "line", size = .6, color = "lightgreen") +
+    stat_smooth(aes(x = year, y = Temp.sumy1med), method = "gam", size = 1, color = "darkgreen") +
+  stat_summary(data = ZoDensWQsem.No0_Predict,
+               aes(x = year, y = Temp.sumy1med), fun.data = "mean_se", geom = "line", size = .9) #+
+  #facet_wrap(~STATION, scales = "free_y")
+
+
+```
+
+#Visualize the Future Environment: Nutrient Management Scenarios
+
+
+#Visualize the Future of SAV: Summary DFs by Community and Scenario
+```{r summary DFs for all simulations}
+ZoFuture.DWM = Zo_CC.PredOneTrueBae.DWM %>% 
+  mutate(Area = predict(dwm.to.HA_Zo, newdata = .))   %>%
+  add_column(Scen = "No Action", SpCluster = "Zostera") %>%
+  bind_rows(Zo_WIP.PredOneTrueBae.DWM %>% 
+              mutate(Area = predict(dwm.to.HA_Zo, newdata = .))   %>%
+              add_column(Scen = "Nutrient Reduction", SpCluster = "Zostera")) %>%
+  mutate(Area.Z = Area)#%>%
+ # group_by(Scen, simnum_OB, year, SpCluster) %>% 
+  #summarise(DWM.total = sum(dens.weight.mean), 
+  #          Area.total = sum(Area, na.rm = T)) 
+
+RuFuture.DWM = Ru_CC.PredOneTrueBae.DWM %>% 
+  mutate(Area = predict(dwm.to.HA_Ru, newdata = .))   %>%
+  add_column(Scen = "No Action", SpCluster = "Ruppia") %>%
+  bind_rows(Ru_WIP.PredOneTrueBae.DWM %>% 
+              mutate(Area = predict(dwm.to.HA_Ru, newdata = .))   %>%
+              add_column(Scen = "Nutrient Reduction", SpCluster = "Ruppia")) %>%
+  mutate(Area.R = Area)#%>%
+ # group_by(Scen, simnum_OB, year, SpCluster) %>%
+ # summarise(DWM.total = sum(dens.weight.mean), 
+  #          Area.total = sum(Area, na.rm = T)) 
+FFuture.DWM = F_CC.PredOneTrueBae.DWM %>% 
+  mutate(Area = predict(dwm.to.HA_F, newdata = .))   %>%
+  add_column(Scen = "No Action", SpCluster = "Fresh") %>%
+  full_join(F_WIP.PredOneTrueBae.DWM %>% 
+              mutate(Area = predict(dwm.to.HA_F, newdata = .))   %>%
+              add_column(Scen = "Nutrient Reduction", SpCluster = "Fresh")) %>%
+  mutate(Area.F = Area)
+```
+
+
+
