@@ -3267,6 +3267,7 @@ AllSims.SAV.SEGMENT_Shuff =  right_join(FullBaeFuture.SAVOnly_Shuff,
          DWM.seg.acre = DWM.seg * 2.47105) #convert to acres 1 hectare = 2.47105 acres
 
 vroom_write(AllSims.SAV.SEGMENT_Shuff, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/AllSims.SAV.SEGMENT_Shuff.csv")
+AllSims.SAV.SEGMENT_Shuff = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/AllSims.SAV.SEGMENT_Shuff.csv")
 
  #Build Master Segment for ENV for Shiny app: 
 #BaeEnvGrow.SEGMENT_8420 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/BaeEnvGrow.SEGMENT_8420.csv")
@@ -3280,7 +3281,10 @@ vroom_write(AllSims.SAV.SEGMENT_Shuff, "/Volumes/savshare2/Current Projects/Pred
 
 #Here is the big bad awesome Perfect final DF####
 #Note that, for cross- bay compare of Env Conditions, we use this Growing Season ENV data.
-BaeEnvGrow.SEGMENT_2060 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/BaeEnvGrow.SEGMENT_2060.csv")
+BaeEnvGrow.SEGMENT_2060 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/BaeEnvGrow.SEGMENT_2060.csv") 
+BaeEnvGrow.SEGMENT_2060 = BaeEnvGrow.SEGMENT_2060 %>% 
+  mutate(Scen = case_when(Scen == "No Action" ~ "No Further Reductions", 
+                          Scen == "Nutrient Reduction" ~ "Nutrient Reduction"))
 
 #For some reason, when viewed as the points, it doesnt look that patterened 
 #BaeEnvGrow.SEGMENT_2060 %>%
@@ -3475,8 +3479,8 @@ ggsave("/Volumes/savshare2/Current Projects/Predicting-SAV/MH_Predicting-SAV/Spa
 ```{r FSimSum.. 95% of Shuff Simulations DF by Seg, Comm, Bay}
 FullBaeSAV.EnvGrow_8420 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/FullBaeSAV.EnvGrow_8420.csv")
 
-FullBaeSAV.EnvGrow_2160_Shuff = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/FullBaeSAV.EnvGrow_2160_Shuff.csv") %>% 
-    filter(!Scen %in% c("Connowingo", "No CC No Action"))
+FullBaeSAV.EnvGrow_2160_Shuff = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/FullBaeSAV.EnvGrow_2160_Shuff.csv") #%>% 
+    #filter(!Scen %in% c("Connowingo", "No CC No Action"))
 #SomeBae = 40 random sims
 SomeBaeSAV.EnvGrow_2160 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/SomeBaeSAV.EnvGrow_2160.csv")
 
@@ -3552,9 +3556,9 @@ FSimSum_Trimmed = anti_join(FSimSum_All, FSimSum_5per) %>% anti_join(FSimSum_95p
   ungroup() 
 
 #ALERT! Filtering out the other Scenarios for now but not forever!!!####
-FSimSumSp_Trimmed1 = FSimSumSp_Trimmed %>% filter(Scen %in% c("No Further Action", "Nutrient Reduction"))
-FSimSumSeg_Trimmed1 = FSimSumSeg_Trimmed %>% filter(Scen %in% c("No Further Action", "Nutrient Reduction"))
-FSimSum_Trimmed1 = FSimSum_Trimmed %>% filter(Scen %in% c("No Further Action", "Nutrient Reduction"))
+FSimSumSp_Trimmed1 = FSimSumSp_Trimmed %>% filter(Scen %in% c("No Further Reductions", "Nutrient Reduction"))
+FSimSumSeg_Trimmed1 = FSimSumSeg_Trimmed %>% filter(Scen %in% c("No Further Reductions", "Nutrient Reduction"))
+FSimSum_Trimmed1 = FSimSum_Trimmed %>% filter(Scen %in% c("No Further Reductions", "Nutrient Reduction"))
 
 vroom_write(FSimSumSp_Trimmed1, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/FSimSumSp_Trimmed.csv")
 vroom_write(FSimSumSeg_Trimmed1, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/Multiversal Futures ONEBAY/FSimSumSeg_Trimmed.csv")
