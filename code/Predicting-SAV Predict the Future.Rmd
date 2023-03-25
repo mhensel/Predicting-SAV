@@ -347,6 +347,7 @@ RuDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + log10(
                      (log10(Temp.spme):log10(dens.weight.mean.y1)) + (1|STATION), 
                    data = RuDensWQsem.No0_Predict)
 #model_performance(RuDWM.lmer)
+
 #ru_anov = Anova(RuDWM.lmer, test.statistic = "F")
 
 #MixedMeso Initial and Model####
@@ -371,6 +372,7 @@ MMInt.lmer <- lmer(dens.percomp.change ~ dens.percomp.y1 + log10(TN.summe) + log
 MMDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + log10(TN.summe) + log10(Chla.summe) + log10(TP.summe) +log10(Temp.summin) +log10(Sal.sumy1max):log10(dens.weight.mean.y1) + log10(Chla.summe):log10(dens.weight.mean.y1) + log10(TP.summe):log10(dens.weight.mean.y1) +log10(TN.summe):log10(dens.weight.mean.y1)+ log10(Temp.summin):log10(dens.weight.mean.y1) + (1|STATION), data = MMDensWQsem.No0_Predict)
 
 model_performance(MMDWM.lmer)
+
 mm_anov = Anova(MMDWM.lmer, test.statistic = "F")
 #Fresh Initial and Model####
 FreshDensWQsem.No0_Predict = SAVCommDensWQ_ForPred.with0s %>% 
@@ -411,19 +413,23 @@ FDWM.lmer <- lmer(log10(dens.weight.mean) ~ log10(dens.weight.mean.y1) + #CHECK 
 
 #model_performance(FDWM.lmer)
 #r2(FDWM.lmer)
+
 #f_anov = Anova(FDWM.lmer, test.statistic = "F")
 ```
 
 
 ```{r ANOVA tables for models that do predicting}
-
-zo_anov
+zo_anov = Anova(ZoDWM.lmer, test.statistic = "F")
+ru_anov = Anova(RuDWM.lmer, test.statistic = "F")
+mm_anov = Anova(MMDWM.lmer, test.statistic = "F")
+f_anov = Anova(FDWM.lmer, test.statistic = "F")
+View(zo_anov)
 r2(ZoDWM.lmer)
-ru_anov
+View(ru_anov)
 r2(RuDWM.lmer)
-mm_anov
+View(mm_anov)
 r2(MMDWM.lmer)
-f_anov
+View(f_anov)
 r2(FDWM.lmer)
 
 ```
