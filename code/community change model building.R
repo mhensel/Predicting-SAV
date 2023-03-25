@@ -1,5 +1,5 @@
 #Community Change SEMing#
-library(piecewiseSEM); library(tidyverse); library(readxl); library(patchwork);library(beyonce);
+library(piecewiseSEM); library(tidyverse); library(readxl); library(patchwork);library(beyonce)
 library(lme4); library(MuMIn); library(DHARMa); library(nlme); library(semPlot); library(performance); library(see); library(qqplotr);library(mgcv);library(here)
 #
 library(devtools)
@@ -26,6 +26,7 @@ SAVCommDensWQ_69sem.No0 = anti_join(SAVCommDensWQ_69, SAVCommZeros) %>%
   select(STATION, year, SpCluster, dens.weight.mean, dens.weight.mean.y1, dens.percomp.y1, dens.percomp, dens.percomp.change, denscomp.max, Temp.sumy1med, Temp.sumy1me, Sal.sumy1max, Temp.spmed, Temp.spme, Temp.summin, Temp.summe, Temp.summax, Chla.spme, Chla.summe, Sal.summed, Sal.spme, Sal.summe, Sal.summed, Secc.summe, Secc.spme, TP.spmed, TP.spme, TSS.summe, TP.summe, TP.summax, TN.spme, TN.spmed, TN.summe) #you'll want to select down more and then drop NA at each community, but this is technically all we need for now. IDK whats best but nice to have this here. 
 
 write.csv(SAVCommDensWQ_69sem.No0, "/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69sem.No0.csv")
+SAVCommDensWQ_69sem.No0 = vroom("/Volumes/savshare2/Current Projects/Predicting-SAV/data/communityDFs/SAVCommDensWQ_69sem.No0.csv")
 
 #nacheck
 View(CC.wl_2021_2060 %>% group_by(STATION, year) %>% 
@@ -38,41 +39,6 @@ qplot(x = year, y = dens.percomp.change, color = SpCluster, data = SAVCommDensWQ
 
 
 #Community 1 Ruppia maritima monoculture####
-#OldRuDens_SEM DF build####
-#load in Ru Change and WQ data SPRING ONLY
-RuDensWQsem.all = read.csv("~/Documents/R projects/Predicting-SAV/data/RuDensWQ_spme.csv")%>% #this DF has about 130 more points than Rm_SEM bc springtime means kicks out fewer NAs than the whole giant DF.  
-  #drop_na() %>% #piecewise needs NAs dropped, 500 points from 84,85,88,00
-  dplyr::filter(Sal.spme > 1)  #also drop this one salinity point 
-
-#RuDensWQsem_comb =read.csv("~/Documents/R projects/Predicting-SAV/data/RuDensWQ_combined.csv") this one has all 400 variables
-
-#New 0 filter method: filter out a row if the last 3 years were 0s
-RmZeros = RuDensWQsem.all %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1)) %>%
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
-#anti join the 0s to get a No0 df
-RuDensWQsem.No0 = anti_join(RuDensWQsem.all, RmZeros) %>% drop_na() #1323 points, 
-
-
-#examined the df and found that these were problematic stations
-#RuDensWQsem.Few0 = RuDensWQsem.all %>%
-#filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-#                       "LE3.1", "WT8.3", "CB3.3W")) 
-#69 var df needed for max mins etc, but we dont use it for Ruppia so can ignore
-#RuDensWQsem.69 = RuDensWQ_69 %>%  drop_na() %>% #piecewise needs NAs dropped, 500 points from 84,85,88,00
-#  dplyr::filter(Sal.spme > 1)
-
-#RmZeros69 = RuDensWQsem.69 %>% 
-#  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0) 
-
-#RuDensWQsem.69No0 = anti_join(RuDensWQsem.69, RmZeros69) 
-
-#RuDensWQsem.Few0 = RuDensWQsem.all %>%
-#  filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-#                         "LE3.1", "WT8.3", "CB3.3W")) 
-
-#na exploration
-#spnas= RuDensWQ_spme %>% group_by(year) %>% 
-#  summarise_all(~sum(is.na(.)))
 
 #_NEW RuDens DF Build 1/2021####
 RuDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
@@ -118,6 +84,7 @@ ggplot() +
 #dens.percomp.change   none     0.31        0.35
 #
 #NOTES: dpcY1 -> dpc p val = 0.09, so round. bring Sal.spme direct back in for p val = 0.05, but sal then has a direct negative effect on DPC, and there is a negative interaction effect for Secc.spme 
+
 
 RuppiaChange.sem <- psem(
   Chlasp <- lme(log10(Chla.spme) ~
@@ -751,17 +718,6 @@ View(ZoDensWQ_spme %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.)))
 # filter(!dens.percomp.y1 < 0.02) 
 #ZoDens_WQ= read.csv ("~/Documents/R projects/Predicting-SAV/data/ZoDens_WQ.csv")
 
-ZoDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/ZoDensWQ_69.csv") %>%
-  filter(!STATION %in% c("CB8.1", "CB8.1E", "LE4.2", "EE3.3", "LE5.3")) #Do this line for 574 instead of 703 points. 
-
-ZoZeros = ZoDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1)) %>%
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0)
-
-ZoDensWQ69sem.No0 = anti_join(ZoDensWQ_69, ZoZeros) %>% #for RFs, just run this line
-  select(year, STATION, dens.percomp.change, dens.percomp, dens.percomp.y1, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
-         Chla.spme, TP.spmed, TN.spmed, TN.spme, Secc.summe, Temp.sumy1med, Sal.summed, Temp.spmed, Temp.summed, Temp.spme) %>%
-  drop_na() #%>% filter(dens.percomp.change < .5 & dens.percomp.change > -.8) #ideally you want to select the cols that are going to be used and THEN drop_na()
-
 ZoDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
   filter(SpCluster == "Zostera") %>%
   filter(!denscomp.max < 1) %>%
@@ -1073,24 +1029,7 @@ check_zeroinflation(ZoInt_lmer)
 #
 
 #NOTE: 1/2021 these MM zones got way reduced
-
-#load in MM Change and WQ data
-MixMesoDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/MixMesoDensWQ_69.csv") %>%
-  select(STATION, year, dens.percomp.change, dens.weight.mean, dens.weight.mean.y1, everything())
- # dplyr::filter(Sal.spme > 1)  #also drop this one salinity point 
-  
-View(MixMesoDensWQ_69 %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.))))
-#RuDensWQsem_comb =read.csv("~/Documents/R projects/Predicting-SAV/data/RuDensWQ_combined.csv") this one has all 400 variables
-
-MixMesoZeros = MixMesoDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1)) %>%
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
-#like half of these are under 1, FYI
-MixMesoDensWQ69sem.No0 = anti_join(MixMesoDensWQ_69, MixMesoZeros) %>% #for RFs, just run this line
-  select(year, STATION, dens.percomp.change, dens.percomp.y1, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
-         Chla.summax, Chla.summed, Chla.summe, Chla.spmax, Chla.spme, Temp.summe, TP.summe, TN.summe, TN.summax, TP.summax, Sal.summe, Temp.summax, TP.summe, TN.spme, Sal.spme, Sal.summe, Sal.sumy1max, Sal.summax, Sal.sumy1me,
-         Secc.spmax, TSS.spme, TSS.sumy1max, TSS.summax, TSS.spmax, TSS.summe, TSS.growy1max,  
-         Secc.summe, Temp.sumy1med, Temp.spmin, Temp.summin, Temp.sumy1min, Temp.summed) %>%
-  drop_na() #ideally you want to select the cols that are going to be used and THEN drop_na()
+#ideally you want to select the cols that are going to be used and THEN drop_na()
 
 MMDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
   filter(SpCluster == "MixedMeso") %>%
@@ -1360,19 +1299,6 @@ FreshDensWQ_69 = read.csv("~/Documents/R projects/Predicting-SAV/data/FreshDensW
 
 #View(FreshDensWQ_69 %>% group_by(STATION, year) %>% summarise_all(~sum(is.na(.))))
 #RuDensWQsem_comb =read.csv("~/Documents/R projects/Predicting-SAV/data/RuDensWQ_combined.csv") this one has all 400 variables
-
-FreshZeros = FreshDensWQ_69 %>% mutate(dens.weight.mean.y2 = lag(dens.weight.mean.y1)) %>%
-  dplyr::filter(dens.weight.mean == 0 & dens.weight.mean.y1 == 0 & dens.weight.mean.y2 == 0) 
-
-FreshDensWQ69sem.No0 = anti_join(FreshDensWQ_69, FreshZeros) %>% #for RFs, just run this line
-  select(year, STATION, dens.percomp.change, dens.percomp.y1, dens.weight.mean, dens.weight.mean.y1, denscomp.max,
-          Temp.summe, Temp.sumy1me, Temp.summax, Temp.sumy1max,  TN.summe, TN.summax, TN.spme, TN.spmax, TP.summe, TP.summax, Chla.summe, Sal.summe, Sal.summax, TSS.summe, TSS.summax) %>%
-  drop_na() %>% #ideally you want to select the cols that are going to be used and THEN drop_na()
-  mutate(Sal.summax = Sal.summax + 1, Sal.summe = Sal.summe + 1)
-  
-#FreshDensWQsem.Few0 = FreshDensWQsem.dat %>%
-# filter(!STATION %in% c("TF1.7", "WT7.1", "WT8.2", "RET1.1", 
-#                         "LE3.1", "WT8.3", "CB3.3W")) 
 
 FreshDensWQsem.No0_NEW = SAVCommDensWQ_69sem.No0 %>%
   filter(SpCluster == "Fresh") %>%
